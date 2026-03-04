@@ -2,8 +2,11 @@ package io.github.chatglot.translation;
 
 import java.util.Set;
 import java.util.Locale;
+import net.minecraft.client.MinecraftClient;
 
 public final class LanguageUtil {
+    public static final String MINECRAFT_DEFAULT_TARGET = "MINECRAFT_DEFAULT";
+
     private static final Set<String> SUPPORTED_REGIONAL_CODES = Set.of(
         "EN-US",
         "EN-GB",
@@ -47,6 +50,34 @@ public final class LanguageUtil {
         }
 
         return normalized;
+    }
+
+    public static boolean isMinecraftDefaultTarget(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String normalized = value.trim().replace('-', '_').toUpperCase(Locale.ROOT);
+        return normalized.equals(MINECRAFT_DEFAULT_TARGET) || normalized.equals("DEFAULT");
+    }
+
+    public static String resolveConfiguredTargetLanguage(String configuredTargetLanguage) {
+        if (isMinecraftDefaultTarget(configuredTargetLanguage)) {
+            MinecraftClient client = MinecraftClient.getInstance();
+            if (client != null && client.getLanguageManager() != null) {
+                String currentLanguageCode = client.getLanguageManager().getLanguage();
+                String resolvedCurrent = normalizeTargetLanguage(currentLanguageCode);
+                if (!resolvedCurrent.isBlank()) {
+                    return resolvedCurrent;
+                }
+            }
+            return "EN";
+        }
+
+        String normalized = normalizeTargetLanguage(configuredTargetLanguage);
+        if (!normalized.isBlank()) {
+            return normalized;
+        }
+        return "EN";
     }
 
     public static boolean isSameLanguage(String left, String right) {

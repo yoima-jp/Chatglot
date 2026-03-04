@@ -7,6 +7,7 @@ import io.github.chatglot.translation.LanguageUtil;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import me.shedaniel.clothconfig2.impl.builders.DropdownMenuBuilder;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.resource.language.LanguageDefinition;
 import net.minecraft.client.gui.screen.Screen;
@@ -60,12 +61,14 @@ public final class ChatglotConfigScreenFactory {
 
         List<MinecraftLanguageOption> languageOptions = collectLanguageOptions(client);
         MinecraftLanguageOption currentLanguageOption = resolveCurrentLanguageOption(client, languageOptions);
+        MinecraftLanguageOption defaultLanguageOption = createDefaultLanguageOption(currentLanguageOption);
+        List<MinecraftLanguageOption> selectableLanguageOptions = prependDefaultOption(defaultLanguageOption, languageOptions);
         MinecraftLanguageOption selectedLanguageOption = resolveSelectedLanguageOption(
-            languageOptions,
+            selectableLanguageOptions,
             currentLanguageOption,
+            defaultLanguageOption,
             config.targetLanguage
         );
-        config.targetLanguage = normalizeLanguageCode(selectedLanguageOption.code());
 
         ConfigBuilder builder = ConfigBuilder.create()
             .setParentScreen(parent)
@@ -105,14 +108,17 @@ public final class ChatglotConfigScreenFactory {
         );
         general.addEntry(
             entryBuilder
-                .startSelector(
+                .startDropdownMenu(
                     Text.translatable("chatglot.config.target_language"),
-                    languageOptions.toArray(MinecraftLanguageOption[]::new),
-                    selectedLanguageOption
+                    selectedLanguageOption,
+                    value -> resolveLanguageOptionFromInput(value, selectableLanguageOptions, selectedLanguageOption),
+                    value -> Text.literal(value.label()),
+                    DropdownMenuBuilder.CellCreatorBuilder.of(value -> Text.literal(value.label()))
                 )
-                .setNameProvider(value -> Text.literal(value.label()))
-                .setDefaultValue(currentLanguageOption)
-                .setSaveConsumer(value -> config.targetLanguage = normalizeLanguageCode(value.code()))
+                .setSelections(selectableLanguageOptions)
+                .setDefaultValue(defaultLanguageOption)
+                .setSuggestionMode(false)
+                .setSaveConsumer(value -> config.targetLanguage = toStoredTargetLanguage(value.code()))
                 .build()
         );
         general.addEntry(
@@ -229,8 +235,13 @@ public final class ChatglotConfigScreenFactory {
     private static MinecraftLanguageOption resolveSelectedLanguageOption(
         List<MinecraftLanguageOption> options,
         MinecraftLanguageOption currentLanguageOption,
+        MinecraftLanguageOption defaultLanguageOption,
         String configuredTargetLanguage
     ) {
+        if (LanguageUtil.isMinecraftDefaultTarget(configuredTargetLanguage)) {
+            return defaultLanguageOption;
+        }
+
         String normalizedConfiguredCode = normalizeLanguageCode(configuredTargetLanguage);
         if (!normalizedConfiguredCode.isBlank()) {
             for (MinecraftLanguageOption option : options) {
@@ -257,6 +268,22 @@ public final class ChatglotConfigScreenFactory {
         return currentLanguageOption;
     }
 
+    private static MinecraftLanguageOption createDefaultLanguageOption(MinecraftLanguageOption currentLanguageOption) {
+        String currentLabel = currentLanguageOption.label();
+        String label = Text.translatable("chatglot.config.target_language.default", currentLabel).getString();
+        return new MinecraftLanguageOption(LanguageUtil.MINECRAFT_DEFAULT_TARGET, label);
+    }
+
+    private static List<MinecraftLanguageOption> prependDefaultOption(
+        MinecraftLanguageOption defaultOption,
+        List<MinecraftLanguageOption> languageOptions
+    ) {
+        List<MinecraftLanguageOption> result = new ArrayList<>(languageOptions.size() + 1);
+        result.add(defaultOption);
+        result.addAll(languageOptions);
+        return result;
+    }
+
     private static java.util.Optional<MinecraftLanguageOption> findOptionByCode(
         List<MinecraftLanguageOption> options,
         String languageCode
@@ -273,10 +300,60 @@ public final class ChatglotConfigScreenFactory {
         return java.util.Optional.empty();
     }
 
+    private static java.util.Optional<MinecraftLanguageOption> findOptionByLabel(
+        List<MinecraftLanguageOption> options,
+        String label
+    ) {
+        if (label == null || label.isBlank()) {
+            return java.util.Optional.empty();
+        }
+
+        String trimmed = label.trim();
+        for (MinecraftLanguageOption option : options) {
+            if (option.label().equals(trimmed)) {
+                return java.util.Optional.of(option);
+            }
+        }
+        return java.util.Optional.empty();
+    }
+
+    private static MinecraftLanguageOption resolveLanguageOptionFromInput(
+        String input,
+        List<MinecraftLanguageOption> options,
+        MinecraftLanguageOption fallback
+    ) {
+        if (input == null || input.isBlank()) {
+            return fallback;
+        }
+
+        return findOptionByCode(options, input)
+            .or(() -> findOptionByLabel(options, input))
+            .orElseGet(() -> {
+                String normalized = LanguageUtil.normalizeTargetLanguage(input);
+                if (normalized.isBlank()) {
+                    return fallback;
+                }
+
+                for (MinecraftLanguageOption option : options) {
+                    if (normalized.equals(LanguageUtil.normalizeTargetLanguage(option.code()))) {
+                        return option;
+                    }
+                }
+                return fallback;
+            });
+    }
+
     private static String normalizeLanguageCode(String value) {
         if (value == null || value.isBlank()) {
             return "";
         }
         return value.trim().replace('-', '_').toLowerCase(Locale.ROOT);
+    }
+
+    private static String toStoredTargetLanguage(String optionCode) {
+        if (LanguageUtil.isMinecraftDefaultTarget(optionCode)) {
+            return LanguageUtil.MINECRAFT_DEFAULT_TARGET;
+        }
+        return normalizeLanguageCode(optionCode);
     }
 }

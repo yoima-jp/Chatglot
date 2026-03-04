@@ -79,7 +79,8 @@ public abstract class ChatHudMixin {
             .detectLanguage(plain)
             .orElse("");
 
-        if (detectedLanguage.isBlank() || LanguageUtil.isSameLanguage(detectedLanguage, config.targetLanguage)) {
+        String resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
+        if (detectedLanguage.isBlank() || LanguageUtil.isSameLanguage(detectedLanguage, resolvedTargetLanguage)) {
             return;
         }
 

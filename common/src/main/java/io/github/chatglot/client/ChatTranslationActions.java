@@ -1,6 +1,8 @@
 package io.github.chatglot.client;
 
 import io.github.chatglot.ChatglotRuntime;
+import io.github.chatglot.config.ChatglotConfig;
+import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.TranslationException;
 import java.util.concurrent.CompletionException;
 import org.slf4j.Logger;
@@ -18,8 +20,10 @@ public final class ChatTranslationActions {
         }
 
         ChatglotRuntime runtime = ChatglotRuntime.get();
+        ChatglotConfig config = runtime.configManager().get();
+        String resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
         runtime.translationService()
-            .translate(originalText, sourceLanguageHint, automatic)
+            .translate(originalText, resolvedTargetLanguage, sourceLanguageHint, automatic)
             .thenAccept(ChatOutput::postTranslation)
             .exceptionally(error -> {
                 Throwable unwrapped = unwrap(error);

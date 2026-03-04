@@ -15,6 +15,7 @@
   "chatglot.config.button_label": "Button label",
   "chatglot.config.auto_translate": "Auto-translate",
   "chatglot.config.target_language": "Target language",
+  "chatglot.config.target_language.default": "Default (Minecraft language: %s)",
   "chatglot.config.show_source": "Show source language tag",
   "chatglot.config.provider": "Provider",
   "chatglot.config.provider.deepl": "DeepL",

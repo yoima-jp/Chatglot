@@ -22,7 +22,8 @@
     ]
   },
   "mixins": [
-    "chatglot.mixins.json"
+    "chatglot.mixins.json",
+    "chatglot.fabric.mixins.json"
   ],
   "depends": {
     "fabricloader": "${fabric_loader_version_range}",

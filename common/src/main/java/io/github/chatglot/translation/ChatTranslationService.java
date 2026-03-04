@@ -36,6 +36,7 @@ public final class ChatTranslationService {
 
     public CompletableFuture<TranslationResult> translate(
         String text,
+        String targetLanguage,
         String sourceLanguageHint,
         boolean automatic
     ) {
@@ -47,9 +48,17 @@ public final class ChatTranslationService {
                 throw new CompletionException(new TranslationException("Chatglot is disabled in config."));
             }
 
+            String resolvedTargetLanguage = LanguageUtil.normalizeTargetLanguage(targetLanguage);
+            if (resolvedTargetLanguage.isBlank()) {
+                resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
+            }
+            if (resolvedTargetLanguage.isBlank()) {
+                throw new CompletionException(new TranslationException("Target language is empty."));
+            }
+
             TranslationRequest request = new TranslationRequest(
                 text,
-                LanguageUtil.normalizeTargetLanguage(config.targetLanguage),
+                resolvedTargetLanguage,
                 LanguageUtil.normalize(sourceLanguageHint),
                 automatic
             );

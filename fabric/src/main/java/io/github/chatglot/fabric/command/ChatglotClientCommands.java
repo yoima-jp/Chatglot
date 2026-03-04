@@ -9,6 +9,7 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 
@@ -37,6 +38,7 @@ public final class ChatglotClientCommands {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         return runtime.requestStore().find(id)
             .map(found -> {
+                playTranslateClickSound();
                 ChatTranslationActions.translateAndPublish(found.originalText(), "", false, found.signature());
                 return 1;
             })
@@ -44,6 +46,14 @@ public final class ChatglotClientCommands {
                 source.sendFeedback(Text.translatable("chatglot.command.translate.not_found").formatted(Formatting.RED));
                 return 0;
             });
+    }
+
+    private static void playTranslateClickSound() {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player == null) {
+            return;
+        }
+        client.player.playSound(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5F, 1.0F);
     }
 
     private static int openConfig(FabricClientCommandSource source) {

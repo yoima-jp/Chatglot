@@ -1,0 +1,75 @@
+plugins {
+    id 'dev.architectury.loom' version '1.13-SNAPSHOT' apply false
+    id 'architectury-plugin' version '3.4-SNAPSHOT'
+    id 'com.gradleup.shadow' version '8.3.8' apply false
+}
+
+architectury {
+    minecraft = project.minecraft_version
+}
+
+allprojects {
+    group = rootProject.maven_group
+    version = rootProject.mod_version
+}
+
+subprojects {
+    apply plugin: 'dev.architectury.loom'
+    apply plugin: 'architectury-plugin'
+    apply plugin: 'maven-publish'
+
+    base {
+        archivesName = "${rootProject.archives_base_name}-${project.name}"
+    }
+
+    loom {
+        silentMojangMappingsLicense()
+
+        runs {
+            client {
+                programArgs '--username', 'ChatglotDev'
+            }
+        }
+    }
+
+    repositories {
+        mavenCentral()
+        maven { url = "https://maven.terraformersmc.com/releases/" }
+        maven { url = "https://maven.shedaniel.me/" }
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'Modrinth'
+                    url = "https://api.modrinth.com/maven"
+                }
+            }
+            filter {
+                includeGroup 'maven.modrinth'
+            }
+        }
+    }
+
+    dependencies {
+        minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
+        mappings "net.fabricmc:yarn:${rootProject.yarn_mappings}:v2"
+    }
+
+    java {
+        withSourcesJar()
+        sourceCompatibility = JavaVersion.toVersion(rootProject.java_version)
+        targetCompatibility = JavaVersion.toVersion(rootProject.java_version)
+    }
+
+    tasks.withType(JavaCompile).configureEach {
+        it.options.encoding = 'UTF-8'
+        it.options.release = rootProject.java_version as Integer
+    }
+
+    processResources {
+        def props = providers.gradlePropertiesPrefixedBy('').get()
+        inputs.properties(props)
+        filesMatching(['*.mixins.json', '*.mod.json', 'META-INF/*mods.toml']) {
+            expand(props)
+        }
+    }
+}

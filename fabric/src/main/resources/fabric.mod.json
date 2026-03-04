@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "Chatglot",
+  "description": "Chat translation mod with Codex / DeepL providers and auto translation.",
+  "authors": [
+    "Chatglot contributors"
+  ],
+  "license": "ARR",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "io.github.chatglot.fabric.ChatglotFabricClient"
+    ],
+    "modmenu": [
+      "io.github.chatglot.fabric.config.ChatglotModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "chatglot.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "${fabric_loader_version_range}",
+    "minecraft": ">=${supported_minecraft_min} <=${supported_minecraft_max}",
+    "fabric-api": "${fabric_api_version_range}",
+    "cloth-config": "*"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}

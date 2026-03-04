@@ -1,0 +1,16 @@
+.gradle/
+.idea/
+*.iml
+build/
+out/
+run/
+
+# Architectury multi-project outputs
+common/build/
+fabric/build/
+
+# local caches
+.tmp/
+.vscode/
+config/
+AGENTS.md

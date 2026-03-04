@@ -20,6 +20,7 @@ import java.time.Duration;
 public final class DeepLTranslationProvider implements TranslationProvider {
     private static final String DEEPL_FREE_ENDPOINT = "https://api-free.deepl.com/v2/translate";
     private static final String DEEPL_PRO_ENDPOINT = "https://api.deepl.com/v2/translate";
+    private static final String AUTH_HEADER_PREFIX = "DeepL-Auth-Key ";
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -36,18 +37,16 @@ public final class DeepLTranslationProvider implements TranslationProvider {
         }
 
         StringBuilder body = new StringBuilder();
-        appendForm(body, "auth_key", config.deeplApiKey.trim());
         appendForm(body, "text", request.text());
         appendForm(body, "target_lang", request.targetLanguage());
         if (request.sourceLanguageHint() != null && !request.sourceLanguageHint().isBlank()) {
             appendForm(body, "source_lang", request.sourceLanguageHint());
         }
-        appendForm(body, "tag_handling", "xml");
-
         String endpoint = config.deeplUseFreeApi ? DEEPL_FREE_ENDPOINT : DEEPL_PRO_ENDPOINT;
 
         HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(endpoint))
             .timeout(Duration.ofSeconds(config.requestTimeoutSeconds))
+            .header("Authorization", AUTH_HEADER_PREFIX + config.deeplApiKey.trim())
             .header("Content-Type", "application/x-www-form-urlencoded")
             .POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8))
             .build();

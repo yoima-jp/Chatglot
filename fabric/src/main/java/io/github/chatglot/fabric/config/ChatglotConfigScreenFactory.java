@@ -2,15 +2,19 @@ package io.github.chatglot.fabric.config;
 
 import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.config.ChatglotConfig;
+import io.github.chatglot.fabric.config.entry.CodexAuthButtonEntry;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.Util;
 
 import java.util.Locale;
 
 public final class ChatglotConfigScreenFactory {
+    private static final String DEEPL_API_KEYS_URL = "https://www.deepl.com/ja/your-account/keys";
+
     private enum ProviderOption {
         DEEPL("deepl"),
         CODEX("codex");
@@ -113,6 +117,12 @@ public final class ChatglotConfigScreenFactory {
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.deeplApiKey = value)
                 .build()
+        );
+        deepL.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.deepl_get_api_key"),
+                () -> Util.getOperatingSystem().open(DEEPL_API_KEYS_URL)
+            )
         );
         deepL.addEntry(
             entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.deepl_free"), config.deeplUseFreeApi)

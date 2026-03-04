@@ -21,6 +21,7 @@
   "chatglot.config.provider.codex": "ChatGPT (Codex)",
   "chatglot.config.request_timeout": "リクエストタイムアウト秒",
   "chatglot.config.deepl_key": "DeepL APIキー",
+  "chatglot.config.deepl_get_api_key": "DeepL APIキーを取得",
   "chatglot.config.deepl_free": "DeepL Free API を使う",
   "chatglot.config.codex_python": "Codex Pythonコマンド",
   "chatglot.config.codex_script": "Codex スクリプトパス (空で自動)",

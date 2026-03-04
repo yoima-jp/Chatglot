@@ -64,7 +64,8 @@ public abstract class ChatHudMixin {
             return;
         }
 
-        ChatglotConfig config = ChatglotRuntime.get().configManager().get();
+        ChatglotRuntime runtime = ChatglotRuntime.get();
+        ChatglotConfig config = runtime.configManager().get();
         if (!config.enabled || !config.autoTranslateEnabled) {
             return;
         }
@@ -74,17 +75,20 @@ public abstract class ChatHudMixin {
             return;
         }
 
-        String detectedLanguage = ChatglotRuntime.get()
-            .languageDetectorService()
-            .detectLanguage(plain)
-            .orElse("");
-
         String resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
-        if (detectedLanguage.isBlank() || LanguageUtil.isSameLanguage(detectedLanguage, resolvedTargetLanguage)) {
+        if (resolvedTargetLanguage.isBlank()) {
             return;
         }
 
-        ChatTranslationActions.translateAndPublish(plain, detectedLanguage, true);
+        runtime.languageDetectorService()
+            .detectLanguageAsync(plain)
+            .thenAccept(detectedLanguage -> {
+                String detected = detectedLanguage.orElse("");
+                if (detected.isBlank() || LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
+                    return;
+                }
+                ChatTranslationActions.translateAndPublish(plain, detected, true);
+            });
     }
 
     private static String stripTranslateButtonSuffix(String value, String buttonLabel) {

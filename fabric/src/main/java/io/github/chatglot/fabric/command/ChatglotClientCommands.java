@@ -37,8 +37,7 @@ public final class ChatglotClientCommands {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         return runtime.requestStore().find(id)
             .map(found -> {
-                String detected = runtime.languageDetectorService().detectLanguage(found.originalText()).orElse("");
-                ChatTranslationActions.translateAndPublish(found.originalText(), detected, false);
+                ChatTranslationActions.translateAndPublish(found.originalText(), "", false);
                 return 1;
             })
             .orElseGet(() -> {

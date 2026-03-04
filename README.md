@@ -56,14 +56,16 @@ fabric/  : Fabricエントリポイント、コマンド、設定UI
 - `targetLanguage`: 例 `JA`, `EN`, `EN-US`
 - `autoTranslateEnabled`: 自動翻訳ON/OFF
 - `deeplApiKey`: DeepL APIキー
-- `codexPythonCommand`: Python実行コマンド（例: `python` / `py -3`）
-- `codexScriptPath`: 空欄なら自動探索 (`<gameDir>/codex_auth_call.py` -> 同梱スクリプト抽出)
+- `codexTokenFile`: Codex OAuthトークン保存先（空欄で `config/chatglot/codex_tokens.json`）
+- `codexModel`: Codex モデルID
+- `codexReasoningEffort`: `none|minimal|low|medium|high|xhigh`
+- `codexReasoningSummary`: 既定 `auto`（空欄で未送信）
 
 ## Codex連携について
 
-- 既存の `codex_auth_call.py` を優先利用
-- 見つからない場合は同梱スクリプトを `config/chatglot/codex_auth_call.py` に展開
-- OAuthトークンは `config/chatglot/codex_tokens.json`（既定）に保存
+- Pythonスクリプト連携は廃止し、すべてMOD(Java)内で処理
+- 初回利用時にブラウザOAuthを開始し、`http://localhost:1455/auth/callback` で認可コードを受信
+- OAuthトークンは `config/chatglot/codex_tokens.json`（既定）へ保存し、期限切れ時は自動リフレッシュ
 
 ## 開発メモ
 

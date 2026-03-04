@@ -158,12 +158,6 @@ public final class ChatglotConfigScreenFactory {
 
         ConfigCategory codex = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
         codex.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.codex_python"), config.codexPythonCommand)
-                .setDefaultValue("python")
-                .setSaveConsumer(value -> config.codexPythonCommand = value)
-                .build()
-        );
-        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_token"), config.codexTokenFile)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.codexTokenFile = value)

@@ -23,7 +23,6 @@
   "chatglot.config.deepl_key": "DeepL API key",
   "chatglot.config.deepl_get_api_key": "Get DeepL API key",
   "chatglot.config.deepl_free": "Use DeepL Free endpoint",
-  "chatglot.config.codex_python": "Codex Python command",
   "chatglot.config.codex_token": "Codex token file path (blank=auto)",
   "chatglot.config.codex_model": "Codex model",
   "chatglot.config.codex_effort": "Codex reasoning effort",

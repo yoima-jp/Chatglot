@@ -23,7 +23,6 @@
   "chatglot.config.deepl_key": "DeepL APIキー",
   "chatglot.config.deepl_get_api_key": "DeepL APIキーを取得",
   "chatglot.config.deepl_free": "DeepL Free API を使う",
-  "chatglot.config.codex_python": "Codex Pythonコマンド",
   "chatglot.config.codex_token": "Codex トークン保存パス (空で自動)",
   "chatglot.config.codex_model": "Codex モデル",
   "chatglot.config.codex_effort": "Codex 推論強度",

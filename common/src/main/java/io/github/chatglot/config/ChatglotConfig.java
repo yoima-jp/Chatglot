@@ -1,8 +1,11 @@
 package io.github.chatglot.config;
 
+import java.util.Set;
 import java.util.Locale;
 
 public class ChatglotConfig {
+    private static final Set<String> CODEX_REASONING_EFFORTS = Set.of("none", "minimal", "low", "medium", "high", "xhigh");
+
     public boolean enabled = true;
     public boolean appendTranslateButton = true;
     public String translateButtonLabel = "✍️";
@@ -16,8 +19,6 @@ public class ChatglotConfig {
     public String deeplApiKey = "";
     public boolean deeplUseFreeApi = true;
 
-    public String codexPythonCommand = "python";
-    public String codexScriptPath = "";
     public String codexTokenFile = "";
     public String codexModel = "gpt-5.3-codex";
     public String codexReasoningEffort = "medium";
@@ -39,15 +40,16 @@ public class ChatglotConfig {
         }
         provider = provider.trim().toLowerCase(Locale.ROOT);
 
-        if (codexPythonCommand == null || codexPythonCommand.isBlank()) {
-            codexPythonCommand = "python";
-        }
-
         if (codexModel == null || codexModel.isBlank()) {
             codexModel = "gpt-5.3-codex";
         }
+        codexModel = codexModel.trim();
 
         if (codexReasoningEffort == null || codexReasoningEffort.isBlank()) {
+            codexReasoningEffort = "medium";
+        }
+        codexReasoningEffort = codexReasoningEffort.trim().toLowerCase(Locale.ROOT);
+        if (!CODEX_REASONING_EFFORTS.contains(codexReasoningEffort)) {
             codexReasoningEffort = "medium";
         }
 
@@ -61,14 +63,13 @@ public class ChatglotConfig {
         if (deeplApiKey == null) {
             deeplApiKey = "";
         }
-        if (codexScriptPath == null) {
-            codexScriptPath = "";
-        }
         if (codexTokenFile == null) {
             codexTokenFile = "";
         }
+        codexTokenFile = codexTokenFile.trim();
         if (codexReasoningSummary == null) {
-            codexReasoningSummary = "";
+            codexReasoningSummary = "auto";
         }
+        codexReasoningSummary = codexReasoningSummary.trim();
     }
 }

@@ -28,7 +28,12 @@ public abstract class ChatHudMixin {
         at = @At("HEAD"),
         argsOnly = true
     )
-    private Text chatglot$appendTranslateButton(Text message) {
+    private Text chatglot$appendTranslateButton(
+        Text message,
+        Text originalMessage,
+        MessageSignatureData signature,
+        MessageIndicator indicator
+    ) {
         if (!ChatglotRuntime.isInitialized() || ChatMessagePipelineGuard.isSuppressed()) {
             return message;
         }
@@ -43,7 +48,7 @@ public abstract class ChatHudMixin {
             return message;
         }
 
-        int id = ChatglotRuntime.get().requestStore().register(plain);
+        int id = ChatglotRuntime.get().requestStore().register(plain, signature);
         MutableText button = Text.literal(" " + config.translateButtonLabel)
             .setStyle(
                 Style.EMPTY
@@ -87,7 +92,7 @@ public abstract class ChatHudMixin {
                 if (detected.isBlank() || LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
                     return;
                 }
-                ChatTranslationActions.translateAndPublish(plain, detected, true);
+                ChatTranslationActions.translateAndPublish(plain, detected, true, signature);
             });
     }
 

@@ -141,6 +141,16 @@ public final class ChatglotConfigScreenFactory {
         );
         general.addEntry(
             entryBuilder
+                .startBooleanToggle(
+                    Text.translatable("chatglot.config.overwrite_translation"),
+                    config.overwriteOriginalWithTranslation
+                )
+                .setDefaultValue(false)
+                .setSaveConsumer(value -> config.overwriteOriginalWithTranslation = value)
+                .build()
+        );
+        general.addEntry(
+            entryBuilder
                 .startDropdownMenu(
                     Text.translatable("chatglot.config.target_language"),
                     selectedLanguageOption,

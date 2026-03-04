@@ -3,6 +3,7 @@
   "package": "io.github.chatglot.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "ChatHudAccessor",
     "ChatHudMixin"
   ],
   "injectors": {

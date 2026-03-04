@@ -5,6 +5,7 @@ import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.TranslationException;
 import java.util.concurrent.CompletionException;
+import net.minecraft.network.message.MessageSignatureData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -15,6 +16,15 @@ public final class ChatTranslationActions {
     }
 
     public static void translateAndPublish(String originalText, String sourceLanguageHint, boolean automatic) {
+        translateAndPublish(originalText, sourceLanguageHint, automatic, null);
+    }
+
+    public static void translateAndPublish(
+        String originalText,
+        String sourceLanguageHint,
+        boolean automatic,
+        MessageSignatureData originalSignature
+    ) {
         if (originalText == null || originalText.isBlank()) {
             return;
         }
@@ -24,7 +34,7 @@ public final class ChatTranslationActions {
         String resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
         runtime.translationService()
             .translate(originalText, resolvedTargetLanguage, sourceLanguageHint, automatic)
-            .thenAccept(ChatOutput::postTranslation)
+            .thenAccept(result -> ChatOutput.postTranslation(result, originalText, originalSignature))
             .exceptionally(error -> {
                 Throwable unwrapped = unwrap(error);
                 LOGGER.warn("Translation failed", unwrapped);

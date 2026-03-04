@@ -14,6 +14,7 @@
   "chatglot.config.append_button": "Append translate button to chat",
   "chatglot.config.button_label": "Button label",
   "chatglot.config.auto_translate": "Auto-translate",
+  "chatglot.config.overwrite_translation": "Replace original chat with translation",
   "chatglot.config.target_language": "Target language",
   "chatglot.config.target_language.default": "Default (%s)",
   "chatglot.config.provider": "Provider",

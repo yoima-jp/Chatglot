@@ -14,6 +14,7 @@
   "chatglot.config.append_button": "チャットに翻訳ボタンを付与",
   "chatglot.config.button_label": "ボタンラベル",
   "chatglot.config.auto_translate": "自動翻訳",
+  "chatglot.config.overwrite_translation": "翻訳結果で原文チャットを置換",
   "chatglot.config.target_language": "翻訳先言語",
   "chatglot.config.target_language.default": "デフォルト (%s)",
   "chatglot.config.provider": "プロバイダ",

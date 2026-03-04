@@ -13,6 +13,7 @@ public class ChatglotConfig {
     public String translateButtonLabel = "✍️";
 
     public boolean autoTranslateEnabled = false;
+    public boolean overwriteOriginalWithTranslation = false;
     public String targetLanguage = "EN";
     public boolean showSourceLanguageTag = true;
 

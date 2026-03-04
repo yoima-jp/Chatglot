@@ -37,7 +37,7 @@ public final class ChatglotClientCommands {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         return runtime.requestStore().find(id)
             .map(found -> {
-                ChatTranslationActions.translateAndPublish(found.originalText(), "", false);
+                ChatTranslationActions.translateAndPublish(found.originalText(), "", false, found.signature());
                 return 1;
             })
             .orElseGet(() -> {

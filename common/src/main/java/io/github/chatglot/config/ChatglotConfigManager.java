@@ -15,6 +15,7 @@ public final class ChatglotConfigManager {
 
     private final Path path;
     private ChatglotConfig config;
+    private boolean createdNewConfigFile;
 
     public ChatglotConfigManager(Path configDir) {
         Path modDir = configDir.resolve(ChatglotConstants.MOD_ID);
@@ -28,6 +29,10 @@ public final class ChatglotConfigManager {
 
     public synchronized void reload() {
         this.config = load();
+    }
+
+    public synchronized boolean createdNewConfigFile() {
+        return createdNewConfigFile;
     }
 
     public synchronized void save() {
@@ -47,6 +52,7 @@ public final class ChatglotConfigManager {
                 ChatglotConfig defaults = new ChatglotConfig();
                 defaults.sanitize();
                 Files.writeString(path, GSON.toJson(defaults));
+                createdNewConfigFile = true;
                 return defaults;
             }
 
@@ -55,11 +61,13 @@ public final class ChatglotConfigManager {
                 loaded = new ChatglotConfig();
             }
             loaded.sanitize();
+            createdNewConfigFile = false;
             return loaded;
         } catch (Exception e) {
             LOGGER.error("Failed to load config, using defaults: {}", path, e);
             ChatglotConfig defaults = new ChatglotConfig();
             defaults.sanitize();
+            createdNewConfigFile = false;
             return defaults;
         }
     }

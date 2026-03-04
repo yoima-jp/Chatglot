@@ -49,7 +49,7 @@ public final class ChatTranslationService {
 
             TranslationRequest request = new TranslationRequest(
                 text,
-                LanguageUtil.normalize(config.targetLanguage),
+                LanguageUtil.normalizeTargetLanguage(config.targetLanguage),
                 LanguageUtil.normalize(sourceLanguageHint),
                 automatic
             );

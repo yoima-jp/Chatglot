@@ -107,50 +107,52 @@ public final class ChatglotConfigScreenFactory {
                 .build()
         );
 
-        ConfigCategory providers = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.providers"));
-        providers.addEntry(
+        ConfigCategory deepL = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
+        deepL.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.deepl_key"), config.deeplApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.deeplApiKey = value)
                 .build()
         );
-        providers.addEntry(
+        deepL.addEntry(
             entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.deepl_free"), config.deeplUseFreeApi)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.deeplUseFreeApi = value)
                 .build()
         );
-        providers.addEntry(
+
+        ConfigCategory codex = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
+        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_python"), config.codexPythonCommand)
                 .setDefaultValue("python")
                 .setSaveConsumer(value -> config.codexPythonCommand = value)
                 .build()
         );
-        providers.addEntry(
+        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_script"), config.codexScriptPath)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.codexScriptPath = value)
                 .build()
         );
-        providers.addEntry(
+        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_token"), config.codexTokenFile)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.codexTokenFile = value)
                 .build()
         );
-        providers.addEntry(
+        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_model"), config.codexModel)
                 .setDefaultValue("gpt-5.3-codex")
                 .setSaveConsumer(value -> config.codexModel = value)
                 .build()
         );
-        providers.addEntry(
+        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_effort"), config.codexReasoningEffort)
                 .setDefaultValue("medium")
                 .setSaveConsumer(value -> config.codexReasoningEffort = value)
                 .build()
         );
-        providers.addEntry(
+        codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_summary"), config.codexReasoningSummary)
                 .setDefaultValue("auto")
                 .setSaveConsumer(value -> config.codexReasoningSummary = value)

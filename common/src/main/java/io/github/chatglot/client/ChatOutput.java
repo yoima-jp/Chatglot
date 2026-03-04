@@ -1,7 +1,6 @@
 package io.github.chatglot.client;
 
 import io.github.chatglot.ChatglotConstants;
-import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.translation.TranslationResult;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.MutableText;
@@ -12,18 +11,11 @@ public final class ChatOutput {
     private ChatOutput() {
     }
 
-    public static void postTranslation(TranslationResult result, boolean automatic) {
-        boolean showSourceLanguage = ChatglotRuntime.isInitialized()
-            && ChatglotRuntime.get().configManager().get().showSourceLanguageTag;
-
-        MutableText prefix = Text.literal(ChatglotConstants.INTERNAL_PREFIX + " ").formatted(Formatting.GRAY)
-            .append(Text.literal("[" + result.providerId().toUpperCase() + "] ").formatted(Formatting.DARK_AQUA));
-
-        if (automatic && showSourceLanguage && result.detectedSourceLanguage() != null && !result.detectedSourceLanguage().isBlank()) {
-            prefix.append(Text.literal("(" + result.detectedSourceLanguage().toUpperCase() + ") ").formatted(Formatting.DARK_GRAY));
-        }
-
-        post(prefix.append(Text.literal(result.translatedText())));
+    public static void postTranslation(TranslationResult result) {
+        String translatedText = result.translatedText() == null ? "" : result.translatedText();
+        MutableText prefix = Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
+            .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY));
+        post(prefix.append(Text.literal(translatedText).formatted(Formatting.WHITE)));
     }
 
     public static void postError(String message) {

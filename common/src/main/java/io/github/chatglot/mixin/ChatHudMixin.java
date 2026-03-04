@@ -44,11 +44,10 @@ public abstract class ChatHudMixin {
         }
 
         int id = ChatglotRuntime.get().requestStore().register(plain);
-        MutableText button = Text.literal(" [" + config.translateButtonLabel + "]")
+        MutableText button = Text.literal(" " + config.translateButtonLabel)
             .setStyle(
                 Style.EMPTY
                     .withColor(Formatting.AQUA)
-                    .withBold(true)
                     .withClickEvent(new ClickEvent.RunCommand("/chatglot translate " + id))
                     .withHoverEvent(new HoverEvent.ShowText(Text.translatable("chatglot.translate_button.hover")))
             );
@@ -88,9 +87,14 @@ public abstract class ChatHudMixin {
     }
 
     private static String stripTranslateButtonSuffix(String value, String buttonLabel) {
-        String suffix = " [" + buttonLabel + "]";
+        String suffix = " " + buttonLabel;
         if (value.endsWith(suffix)) {
             return value.substring(0, value.length() - suffix.length());
+        }
+
+        String legacySuffix = " [" + buttonLabel + "]";
+        if (value.endsWith(legacySuffix)) {
+            return value.substring(0, value.length() - legacySuffix.length());
         }
         return value;
     }

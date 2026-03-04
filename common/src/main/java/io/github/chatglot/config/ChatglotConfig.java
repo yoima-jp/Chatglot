@@ -5,7 +5,7 @@ import java.util.Locale;
 public class ChatglotConfig {
     public boolean enabled = true;
     public boolean appendTranslateButton = true;
-    public String translateButtonLabel = "T";
+    public String translateButtonLabel = "✍️";
 
     public boolean autoTranslateEnabled = false;
     public String targetLanguage = "EN";
@@ -27,7 +27,7 @@ public class ChatglotConfig {
 
     public void sanitize() {
         if (translateButtonLabel == null || translateButtonLabel.isBlank()) {
-            translateButtonLabel = "T";
+            translateButtonLabel = "✍️";
         }
         if (targetLanguage == null || targetLanguage.isBlank()) {
             targetLanguage = "EN";

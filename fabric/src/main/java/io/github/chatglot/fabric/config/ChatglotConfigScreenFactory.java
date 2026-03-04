@@ -70,7 +70,7 @@ public final class ChatglotConfigScreenFactory {
         );
         general.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.button_label"), config.translateButtonLabel)
-                .setDefaultValue("T")
+                .setDefaultValue("✍️")
                 .setSaveConsumer(value -> config.translateButtonLabel = value)
                 .build()
         );

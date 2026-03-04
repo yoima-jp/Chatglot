@@ -20,7 +20,7 @@ public final class ChatTranslationActions {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         runtime.translationService()
             .translate(originalText, sourceLanguageHint, automatic)
-            .thenAccept(result -> ChatOutput.postTranslation(result, automatic))
+            .thenAccept(ChatOutput::postTranslation)
             .exceptionally(error -> {
                 Throwable unwrapped = unwrap(error);
                 LOGGER.warn("Translation failed", unwrapped);

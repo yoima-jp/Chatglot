@@ -37,7 +37,6 @@ public final class ChatglotClientCommands {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         return runtime.requestStore().find(id)
             .map(found -> {
-                source.sendFeedback(Text.literal("Translating message #" + id + " ...").formatted(Formatting.GRAY));
                 String detected = runtime.languageDetectorService().detectLanguage(found.originalText()).orElse("");
                 ChatTranslationActions.translateAndPublish(found.originalText(), detected, false);
                 return 1;

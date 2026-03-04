@@ -1,4 +1,6 @@
 {
+  "chatglot.translation.tag": "[TL]",
+  "chatglot.translation.arrow": " -> ",
   "chatglot.translate_button.hover": "Translate this message",
   "chatglot.command.translate.not_found": "No cached message found for that id.",
   "chatglot.command.config.opened": "Opened Chatglot settings.",
@@ -9,7 +11,7 @@
   "chatglot.config.category.provider.deepl": "DeepL",
   "chatglot.config.category.provider.codex": "ChatGPT (Codex)",
   "chatglot.config.enabled": "Enable Chatglot",
-  "chatglot.config.append_button": "Append [T] button to chat",
+  "chatglot.config.append_button": "Append translate button to chat",
   "chatglot.config.button_label": "Button label",
   "chatglot.config.auto_translate": "Auto-translate",
   "chatglot.config.target_language": "Target language",

@@ -1,4 +1,6 @@
 {
+  "chatglot.translation.tag": "【翻訳】",
+  "chatglot.translation.arrow": "➡",
   "chatglot.translate_button.hover": "このメッセージを翻訳",
   "chatglot.command.translate.not_found": "指定IDのメッセージが見つかりません。",
   "chatglot.command.config.opened": "Chatglot設定を開きました。",
@@ -9,7 +11,7 @@
   "chatglot.config.category.provider.deepl": "DeepL",
   "chatglot.config.category.provider.codex": "ChatGPT (Codex)",
   "chatglot.config.enabled": "Chatglot を有効化",
-  "chatglot.config.append_button": "チャットに [T] ボタンを付与",
+  "chatglot.config.append_button": "チャットに翻訳ボタンを付与",
   "chatglot.config.button_label": "ボタンラベル",
   "chatglot.config.auto_translate": "自動翻訳",
   "chatglot.config.target_language": "翻訳先言語",

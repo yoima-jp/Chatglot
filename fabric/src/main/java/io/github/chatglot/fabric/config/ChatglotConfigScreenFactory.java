@@ -121,12 +121,6 @@ public final class ChatglotConfigScreenFactory {
                 .setSaveConsumer(value -> config.targetLanguage = toStoredTargetLanguage(value.code()))
                 .build()
         );
-        general.addEntry(
-            entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.show_source"), config.showSourceLanguageTag)
-                .setDefaultValue(true)
-                .setSaveConsumer(value -> config.showSourceLanguageTag = value)
-                .build()
-        );
         ProviderOption providerOption = ProviderOption.fromConfigValue(config.provider);
         general.addEntry(
             entryBuilder.startEnumSelector(Text.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
@@ -167,12 +161,6 @@ public final class ChatglotConfigScreenFactory {
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_python"), config.codexPythonCommand)
                 .setDefaultValue("python")
                 .setSaveConsumer(value -> config.codexPythonCommand = value)
-                .build()
-        );
-        codex.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.codex_script"), config.codexScriptPath)
-                .setDefaultValue("")
-                .setSaveConsumer(value -> config.codexScriptPath = value)
                 .build()
         );
         codex.addEntry(

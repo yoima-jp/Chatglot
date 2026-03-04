@@ -7,6 +7,10 @@
   "authors": [
     "Chatglot contributors"
   ],
+  "icon": "assets/chatglot/icon.png",
+  "contact": {
+    "homepage": "https://modrinth.com/project/chatglot/"
+  },
   "license": "ARR",
   "environment": "client",
   "entrypoints": {

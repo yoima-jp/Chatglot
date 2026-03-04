@@ -7,6 +7,7 @@ import io.github.chatglot.translation.TranslationProviderRegistry;
 import io.github.chatglot.translation.TranslationRequestStore;
 import io.github.chatglot.translation.provider.CodexTranslationProvider;
 import io.github.chatglot.translation.provider.DeepLTranslationProvider;
+import io.github.chatglot.translation.provider.codex.CodexModelCatalogService;
 import java.nio.file.Path;
 
 public final class ChatglotRuntime {
@@ -19,11 +20,14 @@ public final class ChatglotRuntime {
     private final ChatTranslationService translationService;
     private final LanguageDetectorService languageDetectorService;
     private final TranslationRequestStore requestStore;
+    private final CodexModelCatalogService codexModelCatalogService;
 
     private ChatglotRuntime(Path configDir, Path gameDir) {
         this.configDir = configDir;
         this.gameDir = gameDir;
         this.configManager = new ChatglotConfigManager(configDir);
+        this.codexModelCatalogService = new CodexModelCatalogService(configDir);
+        this.codexModelCatalogService.initializeIfNeeded();
         this.providerRegistry = new TranslationProviderRegistry();
         this.providerRegistry.register(new DeepLTranslationProvider());
         this.providerRegistry.register(new CodexTranslationProvider());
@@ -75,5 +79,9 @@ public final class ChatglotRuntime {
 
     public TranslationRequestStore requestStore() {
         return requestStore;
+    }
+
+    public CodexModelCatalogService codexModelCatalogService() {
+        return codexModelCatalogService;
     }
 }

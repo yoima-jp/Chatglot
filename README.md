@@ -57,8 +57,8 @@ fabric/  : Fabricエントリポイント、コマンド、設定UI
 - `autoTranslateEnabled`: 自動翻訳ON/OFF
 - `deeplApiKey`: DeepL APIキー
 - `codexTokenFile`: Codex OAuthトークン保存先（空欄で `config/chatglot/codex_tokens.json`）
-- `codexModel`: Codex モデルID
-- `codexReasoningEffort`: `none|minimal|low|medium|high|xhigh`
+- `codexModel`: Codex モデルID（起動時に取得・保存したモデル一覧から選択、手動入力も可）
+- `codexReasoningEffort`: `low|medium|high|xhigh`（設定UI表示: `Low|Medium|High|Extra high`）
 - `codexReasoningSummary`: 既定 `auto`（空欄で未送信）
 
 ## Codex連携について
@@ -66,6 +66,8 @@ fabric/  : Fabricエントリポイント、コマンド、設定UI
 - Pythonスクリプト連携は廃止し、すべてMOD(Java)内で処理
 - 初回利用時にブラウザOAuthを開始し、`http://localhost:1455/auth/callback` で認可コードを受信
 - OAuthトークンは `config/chatglot/codex_tokens.json`（既定）へ保存し、期限切れ時は自動リフレッシュ
+- Codexモデル一覧は起動時に `curl -sS https://modelapi.yoima.com/api/codex-models/list` で初回取得し、`config/chatglot/codex_models.json` に保存
+- 2回目以降は保存済み一覧を利用し、「Codexモデル一覧を更新」ボタンを押した時だけ再取得
 
 ## 開発メモ
 

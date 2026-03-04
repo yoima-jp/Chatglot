@@ -1,10 +1,12 @@
 package io.github.chatglot.config;
 
-import java.util.Set;
 import java.util.Locale;
 
 public class ChatglotConfig {
-    private static final Set<String> CODEX_REASONING_EFFORTS = Set.of("none", "minimal", "low", "medium", "high", "xhigh");
+    public static final String CODEX_REASONING_EFFORT_LOW = "low";
+    public static final String CODEX_REASONING_EFFORT_MEDIUM = "medium";
+    public static final String CODEX_REASONING_EFFORT_HIGH = "high";
+    public static final String CODEX_REASONING_EFFORT_EXTRA_HIGH = "xhigh";
 
     public boolean enabled = true;
     public boolean appendTranslateButton = true;
@@ -25,6 +27,20 @@ public class ChatglotConfig {
     public String codexReasoningSummary = "auto";
 
     public int requestTimeoutSeconds = 45;
+
+    public static String normalizeCodexReasoningEffort(String effort) {
+        if (effort == null || effort.isBlank()) {
+            return CODEX_REASONING_EFFORT_MEDIUM;
+        }
+
+        return switch (effort.trim().toLowerCase(Locale.ROOT)) {
+            case CODEX_REASONING_EFFORT_LOW, "none", "minimal" -> CODEX_REASONING_EFFORT_LOW;
+            case CODEX_REASONING_EFFORT_MEDIUM -> CODEX_REASONING_EFFORT_MEDIUM;
+            case CODEX_REASONING_EFFORT_HIGH -> CODEX_REASONING_EFFORT_HIGH;
+            case CODEX_REASONING_EFFORT_EXTRA_HIGH, "extra high", "extra_high", "extra-high", "extrahigh" -> CODEX_REASONING_EFFORT_EXTRA_HIGH;
+            default -> CODEX_REASONING_EFFORT_MEDIUM;
+        };
+    }
 
     public void sanitize() {
         if (translateButtonLabel == null || translateButtonLabel.isBlank()) {
@@ -48,10 +64,7 @@ public class ChatglotConfig {
         if (codexReasoningEffort == null || codexReasoningEffort.isBlank()) {
             codexReasoningEffort = "medium";
         }
-        codexReasoningEffort = codexReasoningEffort.trim().toLowerCase(Locale.ROOT);
-        if (!CODEX_REASONING_EFFORTS.contains(codexReasoningEffort)) {
-            codexReasoningEffort = "medium";
-        }
+        codexReasoningEffort = normalizeCodexReasoningEffort(codexReasoningEffort);
 
         if (requestTimeoutSeconds < 5) {
             requestTimeoutSeconds = 5;

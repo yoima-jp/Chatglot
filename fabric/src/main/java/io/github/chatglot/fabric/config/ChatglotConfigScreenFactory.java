@@ -18,9 +18,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class ChatglotConfigScreenFactory {
     private static final String DEEPL_API_KEYS_URL = "https://www.deepl.com/ja/your-account/keys";
+    private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
 
     private enum ProviderOption {
         DEEPL("deepl"),
@@ -48,6 +52,32 @@ public final class ChatglotConfigScreenFactory {
         }
     }
 
+    private enum CodexReasoningOption {
+        LOW(ChatglotConfig.CODEX_REASONING_EFFORT_LOW),
+        MEDIUM(ChatglotConfig.CODEX_REASONING_EFFORT_MEDIUM),
+        HIGH(ChatglotConfig.CODEX_REASONING_EFFORT_HIGH),
+        EXTRA_HIGH(ChatglotConfig.CODEX_REASONING_EFFORT_EXTRA_HIGH);
+
+        private final String apiValue;
+
+        CodexReasoningOption(String apiValue) {
+            this.apiValue = apiValue;
+        }
+
+        private String apiValue() {
+            return apiValue;
+        }
+
+        private static CodexReasoningOption fromConfigValue(String value) {
+            return switch (ChatglotConfig.normalizeCodexReasoningEffort(value)) {
+                case ChatglotConfig.CODEX_REASONING_EFFORT_LOW -> LOW;
+                case ChatglotConfig.CODEX_REASONING_EFFORT_HIGH -> HIGH;
+                case ChatglotConfig.CODEX_REASONING_EFFORT_EXTRA_HIGH -> EXTRA_HIGH;
+                default -> MEDIUM;
+            };
+        }
+    }
+
     private ChatglotConfigScreenFactory() {
     }
 
@@ -69,6 +99,9 @@ public final class ChatglotConfigScreenFactory {
             defaultLanguageOption,
             config.targetLanguage
         );
+        List<String> selectableCodexModels = collectCodexModelOptions(runtime, config.codexModel);
+        String defaultCodexModel = selectableCodexModels.getFirst();
+        String selectedCodexModel = resolveCodexModelFromInput(config.codexModel, selectableCodexModels, defaultCodexModel);
 
         ConfigBuilder builder = ConfigBuilder.create()
             .setParentScreen(parent)
@@ -164,15 +197,38 @@ public final class ChatglotConfigScreenFactory {
                 .build()
         );
         codex.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.codex_model"), config.codexModel)
-                .setDefaultValue("gpt-5.3-codex")
-                .setSaveConsumer(value -> config.codexModel = value)
+            entryBuilder
+                .startDropdownMenu(
+                    Text.translatable("chatglot.config.codex_model"),
+                    selectedCodexModel,
+                    value -> resolveCodexModelFromInput(value, selectableCodexModels, selectedCodexModel),
+                    Text::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                )
+                .setSelections(selectableCodexModels)
+                .setDefaultValue(defaultCodexModel)
+                .setSuggestionMode(true)
+                .setSaveConsumer(value -> config.codexModel = normalizeCodexModel(value))
                 .build()
         );
         codex.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.codex_effort"), config.codexReasoningEffort)
-                .setDefaultValue("medium")
-                .setSaveConsumer(value -> config.codexReasoningEffort = value)
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.codex_model_refresh"),
+                () -> refreshCodexModelList(runtime, parent)
+            )
+        );
+        CodexReasoningOption codexReasoningOption = CodexReasoningOption.fromConfigValue(config.codexReasoningEffort);
+        codex.addEntry(
+            entryBuilder.startEnumSelector(
+                    Text.translatable("chatglot.config.codex_effort"),
+                    CodexReasoningOption.class,
+                    codexReasoningOption
+                )
+                .setDefaultValue(CodexReasoningOption.MEDIUM)
+                .setEnumNameProvider(
+                    option -> Text.translatable("chatglot.config.codex_effort." + option.name().toLowerCase(Locale.ROOT))
+                )
+                .setSaveConsumer(value -> config.codexReasoningEffort = value.apiValue())
                 .build()
         );
         codex.addEntry(
@@ -183,6 +239,71 @@ public final class ChatglotConfigScreenFactory {
         );
 
         return builder.build();
+    }
+
+    private static List<String> collectCodexModelOptions(ChatglotRuntime runtime, String configuredModel) {
+        List<String> cached = runtime.codexModelCatalogService().getCachedModels();
+        List<String> options = new ArrayList<>(cached);
+
+        String current = normalizeCodexModel(configuredModel);
+        if (current.isBlank()) {
+            current = "gpt-5.3-codex";
+        }
+
+        if (options.isEmpty()) {
+            options.add(current);
+            return options;
+        }
+
+        Set<String> known = Set.copyOf(options);
+        if (!known.contains(current)) {
+            options.addFirst(current);
+        }
+        return options;
+    }
+
+    private static String resolveCodexModelFromInput(String input, List<String> options, String fallback) {
+        String normalized = normalizeCodexModel(input);
+        if (normalized.isBlank()) {
+            return fallback;
+        }
+
+        for (String option : options) {
+            if (option.equalsIgnoreCase(normalized)) {
+                return option;
+            }
+        }
+        return normalized;
+    }
+
+    private static String normalizeCodexModel(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return value.trim();
+    }
+
+    private static void refreshCodexModelList(ChatglotRuntime runtime, Screen parent) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        try {
+            List<String> refreshed = runtime.codexModelCatalogService().refreshModels();
+            LOGGER.info("Refreshed Codex model list from remote API. count={}", refreshed.size());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.codex_model_refresh.success", Integer.toString(refreshed.size())),
+                    false
+                );
+            }
+            client.setScreen(create(parent));
+        } catch (Exception e) {
+            LOGGER.warn("Failed to refresh Codex model list: {}", e.getMessage());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.codex_model_refresh.failed", e.getMessage()),
+                    false
+                );
+            }
+        }
     }
 
     private static List<MinecraftLanguageOption> collectLanguageOptions(MinecraftClient client) {

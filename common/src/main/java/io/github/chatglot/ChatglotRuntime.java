@@ -9,6 +9,7 @@ import io.github.chatglot.translation.provider.AnthropicTranslationProvider;
 import io.github.chatglot.translation.provider.AzureTranslatorTranslationProvider;
 import io.github.chatglot.translation.provider.CodexTranslationProvider;
 import io.github.chatglot.translation.provider.DeepLTranslationProvider;
+import io.github.chatglot.translation.provider.GasTranslationProvider;
 import io.github.chatglot.translation.provider.GeminiTranslationProvider;
 import io.github.chatglot.translation.provider.GoogleTranslationProvider;
 import io.github.chatglot.translation.provider.OpenAiTranslationProvider;
@@ -45,6 +46,7 @@ public final class ChatglotRuntime {
         this.providerRegistry = new TranslationProviderRegistry();
         this.providerRegistry.register(new DeepLTranslationProvider());
         this.providerRegistry.register(new GoogleTranslationProvider());
+        this.providerRegistry.register(new GasTranslationProvider());
         this.providerRegistry.register(new CodexTranslationProvider());
         this.providerRegistry.register(new OpenAiTranslationProvider());
         this.providerRegistry.register(new GeminiTranslationProvider());

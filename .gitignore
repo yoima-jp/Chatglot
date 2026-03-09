@@ -12,5 +12,5 @@ fabric/build/
 # local caches
 .tmp/
 .vscode/
-config/
+/config/
 AGENTS.md

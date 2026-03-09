@@ -6,6 +6,8 @@ import io.github.chatglot.client.ChatMessagePipelineGuard;
 import io.github.chatglot.client.ChatTranslationActions;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.gui.hud.ChatHud;
 import net.minecraft.client.gui.hud.MessageIndicator;
 import net.minecraft.network.message.MessageSignatureData;
@@ -122,7 +124,14 @@ public abstract class ChatHudMixin {
         }
 
         String value = text.getString();
-        if (!(" " + buttonLabel).equals(value) && !(" [" + buttonLabel + "]").equals(value)) {
+        boolean matchesLabel = false;
+        for (String candidateLabel : resolveAcceptedButtonLabels(buttonLabel)) {
+            if ((" " + candidateLabel).equals(value) || (" [" + candidateLabel + "]").equals(value)) {
+                matchesLabel = true;
+                break;
+            }
+        }
+        if (!matchesLabel) {
             return false;
         }
 
@@ -142,6 +151,17 @@ public abstract class ChatHudMixin {
             return value.substring(0, value.length() - legacySuffix.length());
         }
         return value;
+    }
+
+    private static List<String> resolveAcceptedButtonLabels(String buttonLabel) {
+        List<String> labels = new ArrayList<>();
+        if (buttonLabel != null && !buttonLabel.isBlank()) {
+            labels.add(buttonLabel);
+        }
+        if (ChatglotConfig.DEFAULT_TRANSLATE_BUTTON_LABEL.equals(buttonLabel)) {
+            labels.add(ChatglotConfig.LEGACY_TRANSLATE_BUTTON_LABEL);
+        }
+        return labels;
     }
 
     private static boolean isAutoTranslateProviderSupported(String providerId) {

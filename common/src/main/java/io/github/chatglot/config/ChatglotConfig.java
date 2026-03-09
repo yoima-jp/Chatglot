@@ -4,6 +4,7 @@ import java.util.Locale;
 
 public class ChatglotConfig {
     public static final String DEFAULT_TRANSLATE_BUTTON_LABEL = "✍";
+    public static final String LEGACY_TRANSLATE_BUTTON_LABEL = "✍️";
     public static final String DEFAULT_PROVIDER = "default";
     public static final String GAS_DEFAULT_WEB_APP_URL =
         "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
@@ -72,7 +73,11 @@ public class ChatglotConfig {
     }
 
     public void sanitize() {
-        if (translateButtonLabel == null || translateButtonLabel.isBlank() || "✍️".equals(translateButtonLabel)) {
+        if (
+            translateButtonLabel == null
+                || translateButtonLabel.isBlank()
+                || LEGACY_TRANSLATE_BUTTON_LABEL.equals(translateButtonLabel)
+        ) {
             translateButtonLabel = DEFAULT_TRANSLATE_BUTTON_LABEL;
         }
         if (autoTranslateEnabled) {
@@ -170,9 +175,7 @@ public class ChatglotConfig {
         }
         codexReasoningSummary = codexReasoningSummary.trim();
 
-        if (DEFAULT_PROVIDER.equals(provider)) {
-            autoTranslateEnabled = false;
-        }
+        autoTranslateEnabled = autoTranslateEnabledWhenSupported && !DEFAULT_PROVIDER.equals(provider);
 
     }
 }

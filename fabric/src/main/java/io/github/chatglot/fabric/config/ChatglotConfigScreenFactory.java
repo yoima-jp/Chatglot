@@ -309,9 +309,7 @@ function jsonResponse(obj) {
                 .setSaveConsumer(value -> {
                     config.provider = value.id();
                     if (value == ProviderOption.DEFAULT) {
-                        if (config.autoTranslateEnabled) {
-                            config.autoTranslateEnabledWhenSupported = true;
-                        }
+                        config.autoTranslateEnabledWhenSupported = false;
                         config.autoTranslateEnabled = false;
                     } else if (config.autoTranslateEnabledWhenSupported) {
                         config.autoTranslateEnabled = true;
@@ -716,7 +714,7 @@ function jsonResponse(obj) {
                 });
             } catch (Exception e) {
                 LOGGER.warn("Failed to complete Codex OAuth flow: {}", e.getMessage());
-                if (isSupersededCodexAuth(e)) {
+                if (e instanceof CodexOAuthService.SupersededAuthorizationException) {
                     return;
                 }
                 client.execute(() -> {
@@ -731,11 +729,6 @@ function jsonResponse(obj) {
         }, "chatglot-codex-auth");
         authThread.setDaemon(true);
         authThread.start();
-    }
-
-    private static boolean isSupersededCodexAuth(Exception e) {
-        String message = e.getMessage();
-        return message != null && message.contains("a new authorization started");
     }
 
     private static Path resolveCodexTokenFile(ChatglotRuntime runtime, ChatglotConfig config) {

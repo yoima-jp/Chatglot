@@ -68,18 +68,22 @@ public final class CodexOAuthService {
             }
         }
 
+        try {
+            CodexAuthTokens fresh = runBrowserOAuth();
+            tokenStore.write(tokenFile, fresh);
+            return fresh;
+        } catch (SupersededAuthorizationException e) {
+            throw new TranslationException(e.getMessage(), e);
+        }
+    }
+
+    public CodexAuthTokens authenticateInBrowser(Path tokenFile) throws TranslationException, SupersededAuthorizationException {
         CodexAuthTokens fresh = runBrowserOAuth();
         tokenStore.write(tokenFile, fresh);
         return fresh;
     }
 
-    public CodexAuthTokens authenticateInBrowser(Path tokenFile) throws TranslationException {
-        CodexAuthTokens fresh = runBrowserOAuth();
-        tokenStore.write(tokenFile, fresh);
-        return fresh;
-    }
-
-    private CodexAuthTokens runBrowserOAuth() throws TranslationException {
+    private CodexAuthTokens runBrowserOAuth() throws TranslationException, SupersededAuthorizationException {
         String verifier = generateCodeVerifier();
         String challenge = sha256Base64Url(verifier);
         String state = randomState();
@@ -90,6 +94,7 @@ public final class CodexOAuthService {
         LOGGER.info("Starting Codex OAuth flow. URL={}", authorizeUrl);
         try (ServerSocket server = new ServerSocket()) {
             session.attach(server);
+            throwIfSuperseded(session, null);
             server.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), OAUTH_PORT));
             openBrowser(authorizeUrl);
             OAuthCallback callback = waitForCallback(server, state, Duration.ofSeconds(OAUTH_TIMEOUT_SECONDS), session);
@@ -99,7 +104,10 @@ public final class CodexOAuthService {
             return exchangeCodeForTokens(callback.code(), redirectUri, verifier);
         } catch (BindException e) {
             throw new TranslationException("OAuth callback port " + OAUTH_PORT + " is unavailable.", e);
+        } catch (SupersededAuthorizationException e) {
+            throw e;
         } catch (IOException e) {
+            throwIfSuperseded(session, e);
             throw new TranslationException("Failed to run OAuth callback server.", e);
         } finally {
             clearActiveSession(session);
@@ -153,7 +161,7 @@ public final class CodexOAuthService {
     }
 
     private OAuthCallback waitForCallback(ServerSocket server, String expectedState, Duration timeout, OAuthSession session)
-        throws TranslationException {
+        throws TranslationException, SupersededAuthorizationException {
         long deadlineNanos = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < deadlineNanos) {
             long remainingMillis = Duration.ofNanos(deadlineNanos - System.nanoTime()).toMillis();
@@ -169,20 +177,14 @@ public final class CodexOAuthService {
             } catch (SocketTimeoutException e) {
                 break;
             } catch (SocketException e) {
-                if (session.isCancelled()) {
-                    throw new TranslationException("OAuth flow was cancelled because a new authorization started.", e);
-                }
+                throwIfSuperseded(session, e);
                 throw new TranslationException("Failed to receive OAuth callback.", e);
             } catch (IOException e) {
-                if (session.isCancelled()) {
-                    throw new TranslationException("OAuth flow was cancelled because a new authorization started.", e);
-                }
+                throwIfSuperseded(session, e);
                 throw new TranslationException("Failed to receive OAuth callback.", e);
             }
         }
-        if (session.isCancelled()) {
-            throw new TranslationException("OAuth flow was cancelled because a new authorization started.");
-        }
+        throwIfSuperseded(session, null);
         throw new TranslationException("OAuth callback timeout after " + timeout.toSeconds() + " seconds.");
     }
 
@@ -387,6 +389,12 @@ public final class CodexOAuthService {
         }
     }
 
+    private static void throwIfSuperseded(OAuthSession session, Exception cause) throws SupersededAuthorizationException {
+        if (session != null && session.isCancelled()) {
+            throw new SupersededAuthorizationException(cause);
+        }
+    }
+
     private static String generateCodeVerifier() {
         String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
         StringBuilder verifier = new StringBuilder(43);
@@ -518,6 +526,12 @@ public final class CodexOAuthService {
             } catch (IOException ignored) {
                 // Best effort only.
             }
+        }
+    }
+
+    public static final class SupersededAuthorizationException extends Exception {
+        public SupersededAuthorizationException(Throwable cause) {
+            super("OAuth flow was cancelled because a new authorization started.", cause);
         }
     }
 

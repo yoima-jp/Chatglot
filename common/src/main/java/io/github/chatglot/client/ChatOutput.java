@@ -5,6 +5,7 @@ import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.mixin.ChatHudAccessor;
 import io.github.chatglot.translation.TranslationResult;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ChatHud;
@@ -18,7 +19,7 @@ public final class ChatOutput {
     private ChatOutput() {
     }
 
-    public static void postTranslation(
+    static void postTranslation(
         TranslationResult result,
         String originalText,
         MessageSignatureData originalSignature,
@@ -170,7 +171,12 @@ public final class ChatOutput {
             return true;
         }
 
-        return stripTranslateButtonSuffix(content, buttonLabel).equals(originalText);
+        for (String candidateLabel : resolveAcceptedButtonLabels(buttonLabel)) {
+            if (stripTranslateButtonSuffix(content, candidateLabel).equals(originalText)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String stripTranslateButtonSuffix(String value, String buttonLabel) {
@@ -189,5 +195,16 @@ public final class ChatOutput {
         }
 
         return value;
+    }
+
+    private static List<String> resolveAcceptedButtonLabels(String buttonLabel) {
+        List<String> labels = new ArrayList<>();
+        if (buttonLabel != null && !buttonLabel.isBlank()) {
+            labels.add(buttonLabel);
+        }
+        if (ChatglotConfig.DEFAULT_TRANSLATE_BUTTON_LABEL.equals(buttonLabel)) {
+            labels.add(ChatglotConfig.LEGACY_TRANSLATE_BUTTON_LABEL);
+        }
+        return labels;
     }
 }

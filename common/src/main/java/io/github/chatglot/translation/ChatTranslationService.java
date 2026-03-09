@@ -3,6 +3,7 @@ package io.github.chatglot.translation;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.config.ChatglotConfigManager;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -63,9 +64,14 @@ public final class ChatTranslationService {
                 automatic
             );
 
-            Optional<TranslationProvider> providerOptional = providerRegistry.get(config.provider);
+            String providerId = resolveProviderId(config.provider);
+            Optional<TranslationProvider> providerOptional = providerRegistry.get(providerId);
             TranslationProvider provider = providerOptional.orElseThrow(
-                () -> new CompletionException(new TranslationException("Unsupported provider: " + config.provider))
+                () -> new CompletionException(
+                    new TranslationException(
+                        "Unsupported provider. Configured='" + config.provider + "', resolved='" + providerId + "'"
+                    )
+                )
             );
 
             try {
@@ -76,6 +82,18 @@ public final class ChatTranslationService {
                 throw new CompletionException(new TranslationException("Unexpected translation failure", e));
             }
         }, executor);
+    }
+
+    private static String resolveProviderId(String configuredProviderId) {
+        if (configuredProviderId == null || configuredProviderId.isBlank()) {
+            return "gas";
+        }
+
+        String normalized = configuredProviderId.trim().toLowerCase(Locale.ROOT);
+        if (ChatglotConfig.DEFAULT_PROVIDER.equals(normalized)) {
+            return "gas";
+        }
+        return normalized;
     }
 
     public void shutdown() {

@@ -71,7 +71,7 @@ public abstract class ChatHudMixin {
 
         ChatglotRuntime runtime = ChatglotRuntime.get();
         ChatglotConfig config = runtime.configManager().get();
-        if (!config.enabled || !config.autoTranslateEnabled) {
+        if (!config.enabled || !config.autoTranslateEnabled || !isAutoTranslateProviderSupported(config.provider)) {
             return;
         }
 
@@ -107,5 +107,12 @@ public abstract class ChatHudMixin {
             return value.substring(0, value.length() - legacySuffix.length());
         }
         return value;
+    }
+
+    private static boolean isAutoTranslateProviderSupported(String providerId) {
+        if (providerId == null || providerId.isBlank()) {
+            return false;
+        }
+        return !ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(providerId.trim());
     }
 }

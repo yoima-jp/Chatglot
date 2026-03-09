@@ -3,6 +3,9 @@ package io.github.chatglot.config;
 import java.util.Locale;
 
 public class ChatglotConfig {
+    public static final String DEFAULT_PROVIDER = "default";
+    public static final String GAS_DEFAULT_WEB_APP_URL =
+        "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
     public static final String CODEX_DEFAULT_MODEL = "gpt-5.3-codex";
     public static final String OPENAI_DEFAULT_MODEL = "gpt-5-nano";
     public static final String GEMINI_DEFAULT_MODEL = "gemini-flash-latest";
@@ -23,7 +26,7 @@ public class ChatglotConfig {
     public String targetLanguage = "EN";
     public boolean showSourceLanguageTag = true;
 
-    public String provider = "deepl";
+    public String provider = DEFAULT_PROVIDER;
 
     public String deeplApiKey = "";
     public boolean deeplUseFreeApi = true;
@@ -74,9 +77,14 @@ public class ChatglotConfig {
         targetLanguage = targetLanguage.trim().toUpperCase(Locale.ROOT);
 
         if (provider == null || provider.isBlank()) {
-            provider = "deepl";
+            provider = DEFAULT_PROVIDER;
         }
         provider = provider.trim().toLowerCase(Locale.ROOT);
+        switch (provider) {
+            case "default", "deepl", "google", "gas", "codex", "openai", "gemini", "anthropic", "azure" -> {
+            }
+            default -> provider = DEFAULT_PROVIDER;
+        }
 
         if (codexModel == null || codexModel.isBlank()) {
             codexModel = CODEX_DEFAULT_MODEL;
@@ -104,6 +112,7 @@ public class ChatglotConfig {
         if (gasWebAppUrl == null) {
             gasWebAppUrl = "";
         }
+        gasWebAppUrl = gasWebAppUrl.trim();
         if (codexTokenFile == null) {
             codexTokenFile = "";
         }
@@ -142,12 +151,14 @@ public class ChatglotConfig {
         }
         azureTranslatorEndpoint = azureTranslatorEndpoint.trim();
         azureTranslatorRegion = azureTranslatorRegion.trim();
-        gasWebAppUrl = gasWebAppUrl.trim();
-
         codexTokenFile = codexTokenFile.trim();
         if (codexReasoningSummary == null) {
             codexReasoningSummary = "auto";
         }
         codexReasoningSummary = codexReasoningSummary.trim();
+
+        if (DEFAULT_PROVIDER.equals(provider)) {
+            autoTranslateEnabled = false;
+        }
     }
 }

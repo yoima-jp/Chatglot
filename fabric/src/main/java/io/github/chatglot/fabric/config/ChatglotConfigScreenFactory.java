@@ -100,14 +100,15 @@ function jsonResponse(obj) {
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
 
     private enum ProviderOption {
+        DEFAULT("default"),
+        GAS("gas"),
         DEEPL("deepl"),
         GOOGLE("google"),
-        GAS("gas"),
         CODEX("codex"),
+        AZURE("azure"),
         OPENAI("openai"),
         GEMINI("gemini"),
-        ANTHROPIC("anthropic"),
-        AZURE("azure");
+        ANTHROPIC("anthropic");
 
         private final String id;
 
@@ -121,18 +122,20 @@ function jsonResponse(obj) {
 
         private static ProviderOption fromConfigValue(String value) {
             if (value == null || value.isBlank()) {
-                return DEEPL;
+                return DEFAULT;
             }
 
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
-                case "google" -> GOOGLE;
+                case "default" -> DEFAULT;
                 case "gas" -> GAS;
+                case "deepl" -> DEEPL;
+                case "google" -> GOOGLE;
                 case "codex" -> CODEX;
+                case "azure" -> AZURE;
                 case "openai" -> OPENAI;
                 case "gemini" -> GEMINI;
                 case "anthropic" -> ANTHROPIC;
-                case "azure" -> AZURE;
-                default -> DEEPL;
+                default -> DEFAULT;
             };
         }
     }
@@ -285,17 +288,33 @@ function jsonResponse(obj) {
         ProviderOption providerOption = ProviderOption.fromConfigValue(config.provider);
         general.addEntry(
             entryBuilder.startEnumSelector(Text.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
-                .setDefaultValue(ProviderOption.DEEPL)
+                .setDefaultValue(ProviderOption.DEFAULT)
                 .setEnumNameProvider(option -> Text.translatable("chatglot.config.provider." + option.name().toLowerCase(Locale.ROOT)))
-                .setSaveConsumer(value -> config.provider = value.id())
+                .setSaveConsumer(value -> {
+                    config.provider = value.id();
+                    if (value == ProviderOption.DEFAULT) {
+                        config.autoTranslateEnabled = false;
+                    }
+                })
                 .build()
         );
+        general.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.provider_notice")).build());
         general.addEntry(
             entryBuilder.startIntField(Text.translatable("chatglot.config.request_timeout"), config.requestTimeoutSeconds)
                 .setDefaultValue(45)
                 .setSaveConsumer(value -> config.requestTimeoutSeconds = value)
                 .build()
         );
+
+        // Keep provider tabs in requested order.
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.google"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
 
         ConfigCategory deepL = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
         deepL.addEntry(

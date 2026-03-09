@@ -7,11 +7,13 @@ import java.util.Optional;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
+import net.minecraft.util.Formatting;
 
 final class StyledTranslationTemplate {
     private static final String TOKEN_PREFIX = "[[CGT_";
     private static final String TOKEN_SUFFIX = "]]";
     private static final String TOKEN_CLOSE_PREFIX = "[[/CGT_";
+    private static final Style DEFAULT_TEXT_STYLE = Style.EMPTY.withColor(Formatting.WHITE);
 
     private final String markedText;
     private final List<Segment> segments;
@@ -20,7 +22,7 @@ final class StyledTranslationTemplate {
     private StyledTranslationTemplate(String markedText, List<Segment> segments, Style fallbackStyle) {
         this.markedText = markedText;
         this.segments = segments;
-        this.fallbackStyle = fallbackStyle == null ? Style.EMPTY : fallbackStyle;
+        this.fallbackStyle = mergeWithDefaultStyle(fallbackStyle);
     }
 
     public static StyledTranslationTemplate create(Text originalMessage, String fallbackPlainText) {
@@ -39,7 +41,7 @@ final class StyledTranslationTemplate {
             Segment segment = new Segment(
                 TOKEN_PREFIX + index + TOKEN_SUFFIX,
                 TOKEN_CLOSE_PREFIX + index + TOKEN_SUFFIX,
-                style == null ? Style.EMPTY : style
+                mergeWithDefaultStyle(style)
             );
             segments.add(segment);
             marked.append(segment.openToken()).append(string).append(segment.closeToken());
@@ -111,14 +113,21 @@ final class StyledTranslationTemplate {
         if (text == null || text.isEmpty()) {
             return;
         }
-        target.append(Text.literal(text).setStyle(style == null ? Style.EMPTY : style));
+        target.append(Text.literal(text).setStyle(mergeWithDefaultStyle(style)));
+    }
+
+    private static Style mergeWithDefaultStyle(Style style) {
+        if (style == null) {
+            return DEFAULT_TEXT_STYLE;
+        }
+        return style.withParent(DEFAULT_TEXT_STYLE);
     }
 
     private record Segment(String openToken, String closeToken, Style style) {
         private Segment {
             Objects.requireNonNull(openToken, "openToken");
             Objects.requireNonNull(closeToken, "closeToken");
-            style = style == null ? Style.EMPTY : style;
+            style = mergeWithDefaultStyle(style);
         }
     }
 

@@ -30,7 +30,7 @@ public final class CodexTranslationProvider implements TranslationProvider {
         String translated = responsesService.translate(
             tokens,
             config.codexModel,
-            buildPrompt(request),
+            TranslationPromptBuilder.buildStandardPrompt(request),
             config.codexReasoningEffort,
             config.codexReasoningSummary,
             config.requestTimeoutSeconds
@@ -46,21 +46,5 @@ public final class CodexTranslationProvider implements TranslationProvider {
             return Path.of(config.codexTokenFile.trim());
         }
         return configDir.resolve(ChatglotConstants.MOD_ID).resolve(TOKEN_FILENAME);
-    }
-
-    private static String buildPrompt(TranslationRequest request) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("Translate the following Minecraft chat message into ")
-            .append(request.targetLanguage())
-            .append(". ")
-            .append("Preserve player names, commands, URLs, placeholders, and formatting markers when possible. ")
-            .append("Return only translated text without explanations.");
-
-        if (request.sourceLanguageHint() != null && !request.sourceLanguageHint().isBlank()) {
-            builder.append(" Source language hint: ").append(request.sourceLanguageHint()).append('.');
-        }
-
-        builder.append("\n\nMessage:\n").append(request.text());
-        return builder.toString();
     }
 }

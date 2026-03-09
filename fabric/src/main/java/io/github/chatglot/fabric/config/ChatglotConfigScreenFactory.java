@@ -4,31 +4,36 @@ import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.fabric.config.entry.CodexAuthButtonEntry;
 import io.github.chatglot.translation.LanguageUtil;
-import me.shedaniel.clothconfig2.api.ConfigBuilder;
-import me.shedaniel.clothconfig2.api.ConfigCategory;
-import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
-import me.shedaniel.clothconfig2.impl.builders.DropdownMenuBuilder;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.resource.language.LanguageDefinition;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.text.Text;
-import net.minecraft.util.Util;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import me.shedaniel.clothconfig2.api.ConfigBuilder;
+import me.shedaniel.clothconfig2.api.ConfigCategory;
+import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import me.shedaniel.clothconfig2.impl.builders.DropdownMenuBuilder;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.resource.language.LanguageDefinition;
+import net.minecraft.text.Text;
+import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class ChatglotConfigScreenFactory {
     private static final String DEEPL_API_KEYS_URL = "https://www.deepl.com/ja/your-account/keys";
+    private static final String OPENAI_API_KEYS_URL = "https://platform.openai.com/api-keys";
+    private static final String GEMINI_API_KEYS_URL = "https://aistudio.google.com/app/apikey";
+    private static final String ANTHROPIC_API_KEYS_URL = "https://console.anthropic.com/settings/keys";
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
 
     private enum ProviderOption {
         DEEPL("deepl"),
-        CODEX("codex");
+        CODEX("codex"),
+        OPENAI("openai"),
+        GEMINI("gemini"),
+        ANTHROPIC("anthropic");
 
         private final String id;
 
@@ -47,6 +52,9 @@ public final class ChatglotConfigScreenFactory {
 
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
                 case "codex" -> CODEX;
+                case "openai" -> OPENAI;
+                case "gemini" -> GEMINI;
+                case "anthropic" -> ANTHROPIC;
                 default -> DEEPL;
             };
         }
@@ -99,9 +107,42 @@ public final class ChatglotConfigScreenFactory {
             defaultLanguageOption,
             config.targetLanguage
         );
-        List<String> selectableCodexModels = collectCodexModelOptions(runtime, config.codexModel);
+
+        List<String> selectableCodexModels = collectModelOptions(
+            runtime.codexModelCatalogService().getCachedModels(),
+            config.codexModel,
+            ChatglotConfig.CODEX_DEFAULT_MODEL
+        );
         String defaultCodexModel = selectableCodexModels.getFirst();
-        String selectedCodexModel = resolveCodexModelFromInput(config.codexModel, selectableCodexModels, defaultCodexModel);
+        String selectedCodexModel = resolveModelFromInput(config.codexModel, selectableCodexModels, defaultCodexModel);
+
+        List<String> selectableOpenAiModels = collectModelOptions(
+            runtime.openAiModelCatalogService().getCachedModels(),
+            config.openaiModel,
+            ChatglotConfig.OPENAI_DEFAULT_MODEL
+        );
+        String defaultOpenAiModel = selectableOpenAiModels.getFirst();
+        String selectedOpenAiModel = resolveModelFromInput(config.openaiModel, selectableOpenAiModels, defaultOpenAiModel);
+
+        List<String> selectableGeminiModels = collectModelOptions(
+            runtime.geminiModelCatalogService().getCachedModels(),
+            config.geminiModel,
+            ChatglotConfig.GEMINI_DEFAULT_MODEL
+        );
+        String defaultGeminiModel = selectableGeminiModels.getFirst();
+        String selectedGeminiModel = resolveModelFromInput(config.geminiModel, selectableGeminiModels, defaultGeminiModel);
+
+        List<String> selectableAnthropicModels = collectModelOptions(
+            runtime.anthropicModelCatalogService().getCachedModels(),
+            config.anthropicModel,
+            ChatglotConfig.ANTHROPIC_DEFAULT_MODEL
+        );
+        String defaultAnthropicModel = selectableAnthropicModels.getFirst();
+        String selectedAnthropicModel = resolveModelFromInput(
+            config.anthropicModel,
+            selectableAnthropicModels,
+            defaultAnthropicModel
+        );
 
         ConfigBuilder builder = ConfigBuilder.create()
             .setParentScreen(parent)
@@ -211,14 +252,14 @@ public final class ChatglotConfigScreenFactory {
                 .startDropdownMenu(
                     Text.translatable("chatglot.config.codex_model"),
                     selectedCodexModel,
-                    value -> resolveCodexModelFromInput(value, selectableCodexModels, selectedCodexModel),
+                    value -> resolveModelFromInput(value, selectableCodexModels, selectedCodexModel),
                     Text::literal,
                     DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
                 )
                 .setSelections(selectableCodexModels)
                 .setDefaultValue(defaultCodexModel)
                 .setSuggestionMode(true)
-                .setSaveConsumer(value -> config.codexModel = normalizeCodexModel(value))
+                .setSaveConsumer(value -> config.codexModel = normalizeModelValue(value))
                 .build()
         );
         codex.addEntry(
@@ -248,16 +289,120 @@ public final class ChatglotConfigScreenFactory {
                 .build()
         );
 
+        ConfigCategory openai = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
+        openai.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.openai_key"), config.openaiApiKey)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.openaiApiKey = value)
+                .build()
+        );
+        openai.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.openai_get_api_key"),
+                () -> Util.getOperatingSystem().open(OPENAI_API_KEYS_URL)
+            )
+        );
+        openai.addEntry(
+            entryBuilder
+                .startDropdownMenu(
+                    Text.translatable("chatglot.config.openai_model"),
+                    selectedOpenAiModel,
+                    value -> resolveModelFromInput(value, selectableOpenAiModels, selectedOpenAiModel),
+                    Text::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                )
+                .setSelections(selectableOpenAiModels)
+                .setDefaultValue(defaultOpenAiModel)
+                .setSuggestionMode(true)
+                .setSaveConsumer(value -> config.openaiModel = normalizeModelValue(value))
+                .build()
+        );
+        openai.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.openai_model_refresh"),
+                () -> refreshOpenAiModelList(runtime, config, parent)
+            )
+        );
+
+        ConfigCategory gemini = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
+        gemini.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.gemini_key"), config.geminiApiKey)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.geminiApiKey = value)
+                .build()
+        );
+        gemini.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.gemini_get_api_key"),
+                () -> Util.getOperatingSystem().open(GEMINI_API_KEYS_URL)
+            )
+        );
+        gemini.addEntry(
+            entryBuilder
+                .startDropdownMenu(
+                    Text.translatable("chatglot.config.gemini_model"),
+                    selectedGeminiModel,
+                    value -> resolveModelFromInput(value, selectableGeminiModels, selectedGeminiModel),
+                    Text::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                )
+                .setSelections(selectableGeminiModels)
+                .setDefaultValue(defaultGeminiModel)
+                .setSuggestionMode(true)
+                .setSaveConsumer(value -> config.geminiModel = normalizeModelValue(value))
+                .build()
+        );
+        gemini.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.gemini_model_refresh"),
+                () -> refreshGeminiModelList(runtime, config, parent)
+            )
+        );
+
+        ConfigCategory anthropic = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
+        anthropic.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.anthropic_key"), config.anthropicApiKey)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.anthropicApiKey = value)
+                .build()
+        );
+        anthropic.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.anthropic_get_api_key"),
+                () -> Util.getOperatingSystem().open(ANTHROPIC_API_KEYS_URL)
+            )
+        );
+        anthropic.addEntry(
+            entryBuilder
+                .startDropdownMenu(
+                    Text.translatable("chatglot.config.anthropic_model"),
+                    selectedAnthropicModel,
+                    value -> resolveModelFromInput(value, selectableAnthropicModels, selectedAnthropicModel),
+                    Text::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                )
+                .setSelections(selectableAnthropicModels)
+                .setDefaultValue(defaultAnthropicModel)
+                .setSuggestionMode(true)
+                .setSaveConsumer(value -> config.anthropicModel = normalizeModelValue(value))
+                .build()
+        );
+        anthropic.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.anthropic_model_refresh"),
+                () -> refreshAnthropicModelList(runtime, config, parent)
+            )
+        );
+
         return builder.build();
     }
 
-    private static List<String> collectCodexModelOptions(ChatglotRuntime runtime, String configuredModel) {
-        List<String> cached = runtime.codexModelCatalogService().getCachedModels();
-        List<String> options = new ArrayList<>(cached);
+    private static List<String> collectModelOptions(List<String> cachedModels, String configuredModel, String defaultModel) {
+        List<String> options = new ArrayList<>(cachedModels);
 
-        String current = normalizeCodexModel(configuredModel);
+        String current = normalizeModelValue(configuredModel);
         if (current.isBlank()) {
-            current = "gpt-5.3-codex";
+            current = defaultModel;
         }
 
         if (options.isEmpty()) {
@@ -272,8 +417,8 @@ public final class ChatglotConfigScreenFactory {
         return options;
     }
 
-    private static String resolveCodexModelFromInput(String input, List<String> options, String fallback) {
-        String normalized = normalizeCodexModel(input);
+    private static String resolveModelFromInput(String input, List<String> options, String fallback) {
+        String normalized = normalizeModelValue(input);
         if (normalized.isBlank()) {
             return fallback;
         }
@@ -286,7 +431,7 @@ public final class ChatglotConfigScreenFactory {
         return normalized;
     }
 
-    private static String normalizeCodexModel(String value) {
+    private static String normalizeModelValue(String value) {
         if (value == null || value.isBlank()) {
             return "";
         }
@@ -310,6 +455,78 @@ public final class ChatglotConfigScreenFactory {
             if (client.player != null) {
                 client.player.sendMessage(
                     Text.translatable("chatglot.config.codex_model_refresh.failed", e.getMessage()),
+                    false
+                );
+            }
+        }
+    }
+
+    private static void refreshOpenAiModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        try {
+            List<String> refreshed = runtime.openAiModelCatalogService().refreshModels(config.openaiApiKey, config.requestTimeoutSeconds);
+            LOGGER.info("Refreshed OpenAI model list from remote API. count={}", refreshed.size());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.openai_model_refresh.success", Integer.toString(refreshed.size())),
+                    false
+                );
+            }
+            client.setScreen(create(parent));
+        } catch (Exception e) {
+            LOGGER.warn("Failed to refresh OpenAI model list: {}", e.getMessage());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.openai_model_refresh.failed", e.getMessage()),
+                    false
+                );
+            }
+        }
+    }
+
+    private static void refreshGeminiModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        try {
+            List<String> refreshed = runtime.geminiModelCatalogService().refreshModels(config.geminiApiKey, config.requestTimeoutSeconds);
+            LOGGER.info("Refreshed Gemini model list from remote API. count={}", refreshed.size());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.gemini_model_refresh.success", Integer.toString(refreshed.size())),
+                    false
+                );
+            }
+            client.setScreen(create(parent));
+        } catch (Exception e) {
+            LOGGER.warn("Failed to refresh Gemini model list: {}", e.getMessage());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.gemini_model_refresh.failed", e.getMessage()),
+                    false
+                );
+            }
+        }
+    }
+
+    private static void refreshAnthropicModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        try {
+            List<String> refreshed = runtime.anthropicModelCatalogService().refreshModels(
+                config.anthropicApiKey,
+                config.requestTimeoutSeconds
+            );
+            LOGGER.info("Refreshed Anthropic model list from remote API. count={}", refreshed.size());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.anthropic_model_refresh.success", Integer.toString(refreshed.size())),
+                    false
+                );
+            }
+            client.setScreen(create(parent));
+        } catch (Exception e) {
+            LOGGER.warn("Failed to refresh Anthropic model list: {}", e.getMessage());
+            if (client.player != null) {
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.anthropic_model_refresh.failed", e.getMessage()),
                     false
                 );
             }

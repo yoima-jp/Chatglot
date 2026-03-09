@@ -55,7 +55,10 @@ public final class DeepLTranslationProvider implements TranslationProvider {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() >= 400) {
                 throw new TranslationException(
-                    "DeepL request failed (" + response.statusCode() + "): " + abbreviate(response.body(), 500)
+                    "DeepL request failed ("
+                        + response.statusCode()
+                        + "): "
+                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
                 );
             }
 
@@ -86,15 +89,5 @@ public final class DeepLTranslationProvider implements TranslationProvider {
         builder.append(URLEncoder.encode(key, StandardCharsets.UTF_8));
         builder.append('=');
         builder.append(URLEncoder.encode(value, StandardCharsets.UTF_8));
-    }
-
-    private static String abbreviate(String text, int maxLength) {
-        if (text == null) {
-            return "";
-        }
-        if (text.length() <= maxLength) {
-            return text;
-        }
-        return text.substring(0, maxLength) + "...";
     }
 }

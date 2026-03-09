@@ -5,9 +5,15 @@ import io.github.chatglot.translation.ChatTranslationService;
 import io.github.chatglot.translation.LanguageDetectorService;
 import io.github.chatglot.translation.TranslationProviderRegistry;
 import io.github.chatglot.translation.TranslationRequestStore;
+import io.github.chatglot.translation.provider.AnthropicTranslationProvider;
 import io.github.chatglot.translation.provider.CodexTranslationProvider;
 import io.github.chatglot.translation.provider.DeepLTranslationProvider;
+import io.github.chatglot.translation.provider.GeminiTranslationProvider;
+import io.github.chatglot.translation.provider.OpenAiTranslationProvider;
 import io.github.chatglot.translation.provider.codex.CodexModelCatalogService;
+import io.github.chatglot.translation.provider.model.AnthropicModelCatalogService;
+import io.github.chatglot.translation.provider.model.GeminiModelCatalogService;
+import io.github.chatglot.translation.provider.model.OpenAiModelCatalogService;
 import java.nio.file.Path;
 
 public final class ChatglotRuntime {
@@ -21,6 +27,9 @@ public final class ChatglotRuntime {
     private final LanguageDetectorService languageDetectorService;
     private final TranslationRequestStore requestStore;
     private final CodexModelCatalogService codexModelCatalogService;
+    private final OpenAiModelCatalogService openAiModelCatalogService;
+    private final GeminiModelCatalogService geminiModelCatalogService;
+    private final AnthropicModelCatalogService anthropicModelCatalogService;
 
     private ChatglotRuntime(Path configDir, Path gameDir) {
         this.configDir = configDir;
@@ -28,9 +37,15 @@ public final class ChatglotRuntime {
         this.configManager = new ChatglotConfigManager(configDir);
         this.codexModelCatalogService = new CodexModelCatalogService(configDir);
         this.codexModelCatalogService.initializeIfNeeded();
+        this.openAiModelCatalogService = new OpenAiModelCatalogService(configDir);
+        this.geminiModelCatalogService = new GeminiModelCatalogService(configDir);
+        this.anthropicModelCatalogService = new AnthropicModelCatalogService(configDir);
         this.providerRegistry = new TranslationProviderRegistry();
         this.providerRegistry.register(new DeepLTranslationProvider());
         this.providerRegistry.register(new CodexTranslationProvider());
+        this.providerRegistry.register(new OpenAiTranslationProvider());
+        this.providerRegistry.register(new GeminiTranslationProvider());
+        this.providerRegistry.register(new AnthropicTranslationProvider());
         this.translationService = new ChatTranslationService(configManager, providerRegistry, configDir, gameDir);
         this.languageDetectorService = new LanguageDetectorService();
         this.requestStore = new TranslationRequestStore();
@@ -83,5 +98,17 @@ public final class ChatglotRuntime {
 
     public CodexModelCatalogService codexModelCatalogService() {
         return codexModelCatalogService;
+    }
+
+    public OpenAiModelCatalogService openAiModelCatalogService() {
+        return openAiModelCatalogService;
+    }
+
+    public GeminiModelCatalogService geminiModelCatalogService() {
+        return geminiModelCatalogService;
+    }
+
+    public AnthropicModelCatalogService anthropicModelCatalogService() {
+        return anthropicModelCatalogService;
     }
 }

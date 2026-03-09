@@ -3,15 +3,15 @@
   "id": "${mod_id}",
   "version": "${mod_version}",
   "name": "Chatglot",
-  "description": "Chat translation mod with Codex / DeepL / OpenAI / Gemini / Anthropic providers and auto translation.",
+  "description": "Multilingual Minecraft chat translation mod with AI providers and optional auto-translation.",
   "authors": [
-    "Chatglot contributors"
+    "yoima"
   ],
   "icon": "assets/chatglot/icon.png",
   "contact": {
     "homepage": "https://modrinth.com/project/chatglot/"
   },
-  "license": "ARR",
+  "license": "MIT",
   "environment": "client",
   "entrypoints": {
     "client": [

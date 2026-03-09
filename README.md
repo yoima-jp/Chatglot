@@ -1,96 +1,123 @@
 # Chatglot
 
-Chatglot は Minecraft チャットを翻訳する Fabric クライアントMODです。
+Chatglot は Minecraft チャットを翻訳する Fabric クライアント MOD です。  
+`common + fabric` のマルチモジュール構成で、複数の翻訳プロバイダを切り替えて利用できます。
 
-- Fabric 1.21.x を想定（デフォルト: `1.21.11`）
-- チャット末尾に `[T]` ボタンを表示し、クリックで翻訳
-- 自動翻訳モード（Lingua による言語判定）
-- 翻訳プロバイダ切り替え（`deepl` / `google` / `gas` / `codex` / `openai` / `gemini` / `anthropic` / `azure`）
-- 設定はゲーム内（Cloth Config）で変更可能
+## 主な機能
 
-## ライセンス
+- チャット末尾に翻訳ボタンを付与（既定ラベル: `✍️`）
+- ボタンクリックまたはコマンドで個別翻訳
+- 自動翻訳（Lingua による言語判定）
+- 翻訳結果を新規行表示、または原文チャットを置換
+- プロバイダ切り替え  
+  `default` / `gas` / `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure`
+- Cloth Config + ModMenu でゲーム内設定
+- `F8` キーで設定画面を直接オープン
 
-`ARR (All Rights Reserved)`
+## 対応バージョン
 
-## 構成
+- Minecraft: `1.21.x`（現在のプロファイル既定は `1.21.11`）
+- Java: `21`
 
-```text
-common/  : ローダー共通の翻訳ロジック・設定・Mixin
-fabric/  : Fabricエントリポイント、コマンド、設定UI
-```
-
-将来的に NeoForge 等へ展開しやすいように `common + loader` 分離構成にしています。
-
-## バージョン切り替え
-
-`version-profiles/` にプロファイルを用意しています。
+`version-profiles/` で以下の切り替えを用意しています。
 
 - `fabric-1.21.11.properties`
-- `fabric-1.21.0.properties`
-
-適用:
 
 ```powershell
-./scripts/use-version-profile.ps1 -ProfileName fabric-1.21.0
+./scripts/use-version-profile.ps1 -ProfileName fabric-1.21.11
 ```
 
-## 起動
+## 開発コマンド
 
 ```powershell
+./gradlew.bat :fabric:build
+./gradlew.bat :fabric:runClient
+```
+
+macOS / Linux の場合:
+
+```bash
+./gradlew :fabric:build
 ./gradlew :fabric:runClient
 ```
 
-## コマンド
+## 操作方法
 
-- `/chatglot translate <id>`: `[T]` ボタンIDのメッセージを翻訳
-- `/chatglot config`: 設定画面を開く
-- `/chatglot save`: 設定を保存
+- チャットメッセージ末尾の `✍️`（既定）をクリックして翻訳
+- `/chatglot translate <id>` で指定IDのメッセージを翻訳
+- `/chatglot config` で設定画面を開く
+- `/chatglot save` で設定を保存
+- `F8` で設定画面を開く（既定キー）
+
+翻訳メッセージは `【翻訳】➡` プレフィックスで表示されます。
 
 ## 設定ファイル
 
-`config/chatglot/chatglot.json`
+- パス: `config/chatglot/chatglot.json`
 
-主な設定:
+主要設定:
 
-- `provider`: `deepl` / `google` / `gas` / `codex` / `openai` / `gemini` / `anthropic` / `azure`
-- `targetLanguage`: 例 `JA`, `EN`, `EN-US`
-- `autoTranslateEnabled`: 自動翻訳ON/OFF
-- `deeplApiKey`: DeepL APIキー
-- `deeplUseFreeApi`: DeepL Free API利用可否
-- `googleTranslateApiKey`: Google Cloud Translation APIキー
-- `gasWebAppUrl`: Google Apps Script WebアプリURL（`.../exec`）
-- `codexTokenFile`: Codex OAuthトークン保存先（空欄で `config/chatglot/codex_tokens.json`）
-- `codexModel`: Codex モデルID（起動時に取得・保存したモデル一覧から選択、手動入力も可）
-- `codexReasoningEffort`: `low|medium|high|xhigh`（設定UI表示: `Low|Medium|High|Extra high`）
-- `codexReasoningSummary`: 既定 `auto`（空欄で未送信）
-- `openaiApiKey` / `openaiModel`: OpenAI APIキーとモデル
-- `geminiApiKey` / `geminiModel`: Gemini APIキーとモデル
-- `anthropicApiKey` / `anthropicModel`: Anthropic APIキーとモデル
-- `azureTranslatorApiKey`: Azure Translator APIキー
-- `azureTranslatorRegion`: Azureリージョン（任意。リージョナルリソースでは推奨）
-- `azureTranslatorEndpoint`: Azureエンドポイント（既定: `https://api.cognitive.microsofttranslator.com`）
+- `enabled`: MOD全体の有効/無効
+- `appendTranslateButton`: 翻訳ボタンをチャットへ追加
+- `translateButtonLabel`: ボタンラベル（既定 `✍️`）
+- `autoTranslateEnabled`: 自動翻訳の有効/無効
+- `overwriteOriginalWithTranslation`: 原文置換モード
+- `targetLanguage`: 例 `JA`, `EN`, `EN-US`, `ZH-HANS`  
+  初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
+- `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure`
+- `requestTimeoutSeconds`: 通信タイムアウト秒（5〜240）
 
-## GAS連携（Google Apps Script）
+プロバイダ固有設定:
 
-1. ゲーム内設定の `Google Apps Script (GAS)` カテゴリで `GASコードをコピー` を押す
-2. `Apps Scriptを開く` ボタン、または [https://script.google.com/home/?hl=ja&pli=1](https://script.google.com/home/?hl=ja&pli=1) を開く
-3. 新しいプロジェクトを作成し、コピーしたコードを貼り付けて保存
-4. 右上の `デプロイ` -> `新しいデプロイ` -> 種類 `ウェブアプリ` を選択
-5. `次のユーザーとして実行`: `自分`、`アクセスできるユーザー`: `全員`（または利用形態に応じた公開範囲）を設定してデプロイ
-6. 発行された WebアプリURL（`.../exec`）を Chatglot の `GAS WebアプリURL` に設定
-7. `provider` を `gas` に切り替えて翻訳を実行
+- `deeplApiKey`, `deeplUseFreeApi`
+- `googleTranslateApiKey`
+- `gasWebAppUrl`
+- `codexTokenFile`, `codexModel`, `codexReasoningEffort`, `codexReasoningSummary`
+- `openaiApiKey`, `openaiModel`
+- `geminiApiKey`, `geminiModel`
+- `anthropicApiKey`, `anthropicModel`
+- `azureTranslatorApiKey`, `azureTranslatorRegion`, `azureTranslatorEndpoint`
 
-## Codex連携について
+## プロバイダ補足
 
-- Pythonスクリプト連携は廃止し、すべてMOD(Java)内で処理
-- 初回利用時にブラウザOAuthを開始し、`http://localhost:1455/auth/callback` で認可コードを受信
-- OAuthトークンは `config/chatglot/codex_tokens.json`（既定）へ保存し、期限切れ時は自動リフレッシュ
-- Codexモデル一覧は起動時に `curl -sS https://modelapi.yoima.com/api/codex-models/list` で初回取得し、`config/chatglot/codex_models.json` に保存
-- 2回目以降は保存済み一覧を利用し、「Codexモデル一覧を更新」ボタンを押した時だけ再取得
+- `default` は内蔵の無料 GAS エンドポイントを使用します（レート制限あり）。
+- `default` 選択時は自動翻訳は利用できません。
+- `gas` は自分でデプロイした GAS Web アプリ URL（`.../exec`）を使用します。
+- `codex` は初回利用時にブラウザ OAuth を行い、`http://localhost:1455/auth/callback` で認証を受け取ります。
+- モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
 
-## 開発メモ
+## GAS 連携手順
 
-- Java 21
-- Fabric Loader `0.18.4`
-- Fabric API `0.141.3+1.21.11`
-- Loom `dev.architectury.loom 1.13-SNAPSHOT`
+1. 設定画面の `Google Apps Script (GAS)` で `GASコードをコピー`
+2. `Apps Scriptを開く` で Google Apps Script を開く
+3. 新規プロジェクトへコードを貼り付けて保存
+4. `デプロイ` -> `新しいデプロイ` -> `ウェブアプリ`
+5. 実行ユーザーを `自分`、アクセスを `全員`（または用途に応じて）でデプロイ
+6. 発行URL（`.../exec`）を `GAS WebアプリURL` に設定
+7. `provider` を `gas` に切り替えて利用
+
+## キャッシュ/トークンファイル
+
+`config/chatglot/` 配下に以下が作成されます（利用状況に応じて）。
+
+- `chatglot.json`（設定）
+- `codex_tokens.json`（Codex OAuth トークン、`codexTokenFile` 未指定時）
+- `codex_models.json`
+- `openai_models.json`
+- `gemini_models.json`
+- `anthropic_models.json`
+
+## プロジェクト構成
+
+```text
+common/  : ローダー共通の翻訳ロジック・設定・Mixin
+fabric/  : Fabricエントリポイント、クライアントコマンド、設定UI
+```
+
+## ライセンス
+
+`MIT`
+
+## 製作者
+
+`yoima`

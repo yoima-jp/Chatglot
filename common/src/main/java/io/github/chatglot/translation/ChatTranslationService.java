@@ -67,7 +67,11 @@ public final class ChatTranslationService {
             String providerId = resolveProviderId(config.provider);
             Optional<TranslationProvider> providerOptional = providerRegistry.get(providerId);
             TranslationProvider provider = providerOptional.orElseThrow(
-                () -> new CompletionException(new TranslationException("Unsupported provider: " + config.provider))
+                () -> new CompletionException(
+                    new TranslationException(
+                        "Unsupported provider. Configured='" + config.provider + "', resolved='" + providerId + "'"
+                    )
+                )
             );
 
             try {

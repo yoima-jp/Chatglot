@@ -111,7 +111,7 @@ public abstract class ChatHudMixin {
 
     private static boolean isAutoTranslateProviderSupported(String providerId) {
         if (providerId == null || providerId.isBlank()) {
-            return true;
+            return false;
         }
         return !ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(providerId.trim());
     }

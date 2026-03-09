@@ -7,6 +7,7 @@ public class ChatglotConfig {
     public static final String OPENAI_DEFAULT_MODEL = "gpt-5-nano";
     public static final String GEMINI_DEFAULT_MODEL = "gemini-flash-latest";
     public static final String ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
+    public static final String AZURE_TRANSLATOR_DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
 
     public static final String CODEX_REASONING_EFFORT_LOW = "low";
     public static final String CODEX_REASONING_EFFORT_MEDIUM = "medium";
@@ -26,6 +27,7 @@ public class ChatglotConfig {
 
     public String deeplApiKey = "";
     public boolean deeplUseFreeApi = true;
+    public String googleTranslateApiKey = "";
 
     public String codexTokenFile = "";
     public String codexModel = CODEX_DEFAULT_MODEL;
@@ -40,6 +42,10 @@ public class ChatglotConfig {
 
     public String anthropicApiKey = "";
     public String anthropicModel = ANTHROPIC_DEFAULT_MODEL;
+
+    public String azureTranslatorApiKey = "";
+    public String azureTranslatorRegion = "";
+    public String azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
 
     public int requestTimeoutSeconds = 45;
 
@@ -91,6 +97,9 @@ public class ChatglotConfig {
         if (deeplApiKey == null) {
             deeplApiKey = "";
         }
+        if (googleTranslateApiKey == null) {
+            googleTranslateApiKey = "";
+        }
         if (codexTokenFile == null) {
             codexTokenFile = "";
         }
@@ -117,6 +126,18 @@ public class ChatglotConfig {
             anthropicModel = ANTHROPIC_DEFAULT_MODEL;
         }
         anthropicModel = anthropicModel.trim();
+
+        if (azureTranslatorApiKey == null) {
+            azureTranslatorApiKey = "";
+        }
+        if (azureTranslatorRegion == null) {
+            azureTranslatorRegion = "";
+        }
+        if (azureTranslatorEndpoint == null || azureTranslatorEndpoint.isBlank()) {
+            azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
+        }
+        azureTranslatorEndpoint = azureTranslatorEndpoint.trim();
+        azureTranslatorRegion = azureTranslatorRegion.trim();
 
         codexTokenFile = codexTokenFile.trim();
         if (codexReasoningSummary == null) {

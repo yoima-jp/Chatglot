@@ -23,17 +23,21 @@ import org.slf4j.LoggerFactory;
 
 public final class ChatglotConfigScreenFactory {
     private static final String DEEPL_API_KEYS_URL = "https://www.deepl.com/ja/your-account/keys";
+    private static final String GOOGLE_TRANSLATE_API_KEYS_URL = "https://console.cloud.google.com/apis/credentials";
     private static final String OPENAI_API_KEYS_URL = "https://platform.openai.com/api-keys";
     private static final String GEMINI_API_KEYS_URL = "https://aistudio.google.com/app/apikey";
     private static final String ANTHROPIC_API_KEYS_URL = "https://console.anthropic.com/settings/keys";
+    private static final String AZURE_TRANSLATOR_API_KEYS_URL = "https://portal.azure.com";
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
 
     private enum ProviderOption {
         DEEPL("deepl"),
+        GOOGLE("google"),
         CODEX("codex"),
         OPENAI("openai"),
         GEMINI("gemini"),
-        ANTHROPIC("anthropic");
+        ANTHROPIC("anthropic"),
+        AZURE("azure");
 
         private final String id;
 
@@ -51,10 +55,12 @@ public final class ChatglotConfigScreenFactory {
             }
 
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
+                case "google" -> GOOGLE;
                 case "codex" -> CODEX;
                 case "openai" -> OPENAI;
                 case "gemini" -> GEMINI;
                 case "anthropic" -> ANTHROPIC;
+                case "azure" -> AZURE;
                 default -> DEEPL;
             };
         }
@@ -240,6 +246,20 @@ public final class ChatglotConfigScreenFactory {
                 .build()
         );
 
+        ConfigCategory google = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.google"));
+        google.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.google_key"), config.googleTranslateApiKey)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.googleTranslateApiKey = value)
+                .build()
+        );
+        google.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.google_get_api_key"),
+                () -> Util.getOperatingSystem().open(GOOGLE_TRANSLATE_API_KEYS_URL)
+            )
+        );
+
         ConfigCategory codex = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
         codex.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.codex_token"), config.codexTokenFile)
@@ -392,6 +412,32 @@ public final class ChatglotConfigScreenFactory {
                 Text.translatable("chatglot.config.anthropic_model_refresh"),
                 () -> refreshAnthropicModelList(runtime, config, parent)
             )
+        );
+
+        ConfigCategory azure = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
+        azure.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.azure_key"), config.azureTranslatorApiKey)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.azureTranslatorApiKey = value)
+                .build()
+        );
+        azure.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.azure_get_api_key"),
+                () -> Util.getOperatingSystem().open(AZURE_TRANSLATOR_API_KEYS_URL)
+            )
+        );
+        azure.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.azure_region"), config.azureTranslatorRegion)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.azureTranslatorRegion = value)
+                .build()
+        );
+        azure.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.azure_endpoint"), config.azureTranslatorEndpoint)
+                .setDefaultValue(ChatglotConfig.AZURE_TRANSLATOR_DEFAULT_ENDPOINT)
+                .setSaveConsumer(value -> config.azureTranslatorEndpoint = value)
+                .build()
         );
 
         return builder.build();

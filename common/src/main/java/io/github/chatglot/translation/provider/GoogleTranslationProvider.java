@@ -17,9 +17,16 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public final class GoogleTranslationProvider implements TranslationProvider {
     private static final String GOOGLE_TRANSLATE_ENDPOINT = "https://translation.googleapis.com/language/translate/v2";
+    private static final String GOOGLE_TRANSLATE_ENABLE_URL_TEMPLATE =
+        "https://console.developers.google.com/apis/api/translate.googleapis.com/overview?project=%s";
+    private static final String GOOGLE_TRANSLATE_LIBRARY_URL =
+        "https://console.cloud.google.com/apis/library/translate.googleapis.com";
+    private static final Pattern PROJECT_ID_PATTERN = Pattern.compile("project\\s+([0-9]+)", Pattern.CASE_INSENSITIVE);
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
 
@@ -54,12 +61,7 @@ public final class GoogleTranslationProvider implements TranslationProvider {
         try {
             HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "Google Translation request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
+                throw new TranslationException(buildFailureMessage(response.statusCode(), response.body()));
             }
 
             JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
@@ -89,6 +91,61 @@ public final class GoogleTranslationProvider implements TranslationProvider {
         } catch (Exception e) {
             throw new TranslationException("Google Translation request failed", e);
         }
+    }
+
+    private static String buildFailureMessage(int statusCode, String responseBody) {
+        String abbreviated = TranslationPromptBuilder.abbreviate(responseBody, 500);
+        if (statusCode != 403) {
+            return "Google Translation request failed (" + statusCode + "): " + abbreviated;
+        }
+
+        String apiMessage = extractGoogleApiMessage(responseBody);
+        String normalized = apiMessage.toLowerCase(Locale.ROOT);
+        if (
+            normalized.contains("cloud translation api has not been used in project") ||
+            normalized.contains("it is disabled") ||
+            normalized.contains("service disabled")
+        ) {
+            String projectId = extractProjectId(apiMessage);
+            String enableUrl = projectId == null
+                ? GOOGLE_TRANSLATE_LIBRARY_URL
+                : String.format(Locale.ROOT, GOOGLE_TRANSLATE_ENABLE_URL_TEMPLATE, projectId);
+
+            return "Google Translation request failed (403): Cloud Translation API is disabled or not enabled for this project. " +
+            "Fix: 1) Enable API: " + enableUrl + " 2) Enable Billing for the same project " +
+            "3) wait a few minutes and retry. Raw: " + abbreviated;
+        }
+
+        if (normalized.contains("billing")) {
+            return "Google Translation request failed (403): Billing is not active for this project. " +
+            "Enable Billing in Google Cloud Console, then retry. Raw: " + abbreviated;
+        }
+
+        return "Google Translation request failed (403): " + abbreviated;
+    }
+
+    private static String extractGoogleApiMessage(String responseBody) {
+        try {
+            JsonObject root = JsonParser.parseString(responseBody).getAsJsonObject();
+            JsonObject error = root.getAsJsonObject("error");
+            if (error != null && error.has("message")) {
+                return error.get("message").getAsString();
+            }
+        } catch (Exception ignored) {
+            // Fall through and return raw body.
+        }
+        return responseBody == null ? "" : responseBody;
+    }
+
+    private static String extractProjectId(String message) {
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+        Matcher matcher = PROJECT_ID_PATTERN.matcher(message);
+        if (!matcher.find()) {
+            return null;
+        }
+        return matcher.group(1);
     }
 
     private static String normalizeLanguageCode(String value) {

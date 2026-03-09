@@ -28,6 +28,7 @@ public class ChatglotConfig {
     public String deeplApiKey = "";
     public boolean deeplUseFreeApi = true;
     public String googleTranslateApiKey = "";
+    public String gasWebAppUrl = "";
 
     public String codexTokenFile = "";
     public String codexModel = CODEX_DEFAULT_MODEL;
@@ -100,6 +101,9 @@ public class ChatglotConfig {
         if (googleTranslateApiKey == null) {
             googleTranslateApiKey = "";
         }
+        if (gasWebAppUrl == null) {
+            gasWebAppUrl = "";
+        }
         if (codexTokenFile == null) {
             codexTokenFile = "";
         }
@@ -138,6 +142,7 @@ public class ChatglotConfig {
         }
         azureTranslatorEndpoint = azureTranslatorEndpoint.trim();
         azureTranslatorRegion = azureTranslatorRegion.trim();
+        gasWebAppUrl = gasWebAppUrl.trim();
 
         codexTokenFile = codexTokenFile.trim();
         if (codexReasoningSummary == null) {

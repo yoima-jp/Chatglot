@@ -5,7 +5,7 @@ Chatglot は Minecraft チャットを翻訳する Fabric クライアントMOD�
 - Fabric 1.21.x を想定（デフォルト: `1.21.11`）
 - チャット末尾に `[T]` ボタンを表示し、クリックで翻訳
 - 自動翻訳モード（Lingua による言語判定）
-- 翻訳プロバイダ切り替え（`deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure`）
+- 翻訳プロバイダ切り替え（`deepl` / `google` / `gas` / `codex` / `openai` / `gemini` / `anthropic` / `azure`）
 - 設定はゲーム内（Cloth Config）で変更可能
 
 ## ライセンス
@@ -52,12 +52,13 @@ fabric/  : Fabricエントリポイント、コマンド、設定UI
 
 主な設定:
 
-- `provider`: `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure`
+- `provider`: `deepl` / `google` / `gas` / `codex` / `openai` / `gemini` / `anthropic` / `azure`
 - `targetLanguage`: 例 `JA`, `EN`, `EN-US`
 - `autoTranslateEnabled`: 自動翻訳ON/OFF
 - `deeplApiKey`: DeepL APIキー
 - `deeplUseFreeApi`: DeepL Free API利用可否
 - `googleTranslateApiKey`: Google Cloud Translation APIキー
+- `gasWebAppUrl`: Google Apps Script WebアプリURL（`.../exec`）
 - `codexTokenFile`: Codex OAuthトークン保存先（空欄で `config/chatglot/codex_tokens.json`）
 - `codexModel`: Codex モデルID（起動時に取得・保存したモデル一覧から選択、手動入力も可）
 - `codexReasoningEffort`: `low|medium|high|xhigh`（設定UI表示: `Low|Medium|High|Extra high`）
@@ -68,6 +69,16 @@ fabric/  : Fabricエントリポイント、コマンド、設定UI
 - `azureTranslatorApiKey`: Azure Translator APIキー
 - `azureTranslatorRegion`: Azureリージョン（任意。リージョナルリソースでは推奨）
 - `azureTranslatorEndpoint`: Azureエンドポイント（既定: `https://api.cognitive.microsofttranslator.com`）
+
+## GAS連携（Google Apps Script）
+
+1. ゲーム内設定の `Google Apps Script (GAS)` カテゴリで `GASコードをコピー` を押す
+2. `Apps Scriptを開く` ボタン、または [https://script.google.com/home/?hl=ja&pli=1](https://script.google.com/home/?hl=ja&pli=1) を開く
+3. 新しいプロジェクトを作成し、コピーしたコードを貼り付けて保存
+4. 右上の `デプロイ` -> `新しいデプロイ` -> 種類 `ウェブアプリ` を選択
+5. `次のユーザーとして実行`: `自分`、`アクセスできるユーザー`: `全員`（または利用形態に応じた公開範囲）を設定してデプロイ
+6. 発行された WebアプリURL（`.../exec`）を Chatglot の `GAS WebアプリURL` に設定
+7. `provider` を `gas` に切り替えて翻訳を実行
 
 ## Codex連携について
 

@@ -28,11 +28,81 @@ public final class ChatglotConfigScreenFactory {
     private static final String GEMINI_API_KEYS_URL = "https://aistudio.google.com/app/apikey";
     private static final String ANTHROPIC_API_KEYS_URL = "https://console.anthropic.com/settings/keys";
     private static final String AZURE_TRANSLATOR_API_KEYS_URL = "https://portal.azure.com";
+    private static final String GAS_APPS_SCRIPT_HOME_URL = "https://script.google.com/home/?hl=ja&pli=1";
+    private static final String GAS_SCRIPT_TEMPLATE = """
+function doGet(e) {
+  return handleRequest(e, "GET");
+}
+
+function doPost(e) {
+  return handleRequest(e, "POST");
+}
+
+function handleRequest(e, method) {
+  try {
+    var params = {};
+
+    if (method === "GET") {
+      params = (e && e.parameter) ? e.parameter : {};
+    } else if (method === "POST") {
+      if (e && e.postData && e.postData.contents) {
+        params = JSON.parse(e.postData.contents);
+      }
+    }
+
+    var text = (params.text || "").toString().trim();
+    var target = (params.target || "").toString().trim();
+    var source = (params.source || "").toString().trim();
+
+    if (!text) {
+      return jsonResponse({
+        ok: false,
+        error: "missing_text",
+        message: "The 'text' parameter is required."
+      });
+    }
+
+    if (!target) {
+      return jsonResponse({
+        ok: false,
+        error: "missing_target",
+        message: "The 'target' parameter is required."
+      });
+    }
+
+    var translatedText = LanguageApp.translate(text, source, target);
+
+    return jsonResponse({
+      ok: true,
+      method: method,
+      source: source || "auto",
+      target: target,
+      originalText: text,
+      translatedText: translatedText
+    });
+
+  } catch (err) {
+    return jsonResponse({
+      ok: false,
+      error: "internal_error",
+      message: "An unexpected error occurred.",
+      details: err.message
+    });
+  }
+}
+
+function jsonResponse(obj) {
+  return ContentService
+    .createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+""";
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
 
     private enum ProviderOption {
         DEEPL("deepl"),
         GOOGLE("google"),
+        GAS("gas"),
         CODEX("codex"),
         OPENAI("openai"),
         GEMINI("gemini"),
@@ -56,6 +126,7 @@ public final class ChatglotConfigScreenFactory {
 
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
                 case "google" -> GOOGLE;
+                case "gas" -> GAS;
                 case "codex" -> CODEX;
                 case "openai" -> OPENAI;
                 case "gemini" -> GEMINI;
@@ -257,6 +328,26 @@ public final class ChatglotConfigScreenFactory {
             new CodexAuthButtonEntry(
                 Text.translatable("chatglot.config.google_get_api_key"),
                 () -> Util.getOperatingSystem().open(GOOGLE_TRANSLATE_API_KEYS_URL)
+            )
+        );
+
+        ConfigCategory gas = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
+        gas.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.gas_webapp_url"), config.gasWebAppUrl)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.gasWebAppUrl = value)
+                .build()
+        );
+        gas.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.gas_copy_script"),
+                () -> copyGasScriptTemplate(client)
+            )
+        );
+        gas.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.gas_open_apps_script"),
+                () -> Util.getOperatingSystem().open(GAS_APPS_SCRIPT_HOME_URL)
             )
         );
 
@@ -500,6 +591,18 @@ public final class ChatglotConfigScreenFactory {
             return "";
         }
         return value.trim();
+    }
+
+    private static void copyGasScriptTemplate(MinecraftClient client) {
+        if (client == null || client.keyboard == null) {
+            LOGGER.warn("Failed to copy GAS script: Minecraft keyboard is unavailable.");
+            return;
+        }
+
+        client.keyboard.setClipboard(GAS_SCRIPT_TEMPLATE);
+        if (client.player != null) {
+            client.player.sendMessage(Text.translatable("chatglot.config.gas_script_copied"), false);
+        }
     }
 
     private static void refreshCodexModelList(ChatglotRuntime runtime, Screen parent) {

@@ -62,6 +62,7 @@ macOS / Linux の場合:
 - `translateButtonLabel`: ボタンラベル（既定 `✍️`）
 - `autoTranslateEnabled`: 自動翻訳の有効/無効
 - `overwriteOriginalWithTranslation`: 原文置換モード
+- `showTranslationPrefix`: `【翻訳】➡` プレフィックスの表示/非表示
 - `targetLanguage`: 例 `JA`, `EN`, `EN-US`, `ZH-HANS`  
   初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
 - `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure`

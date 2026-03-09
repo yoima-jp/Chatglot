@@ -281,6 +281,13 @@ function jsonResponse(obj) {
         );
         general.addEntry(
             entryBuilder
+                .startBooleanToggle(Text.translatable("chatglot.config.show_translation_prefix"), config.showTranslationPrefix)
+                .setDefaultValue(true)
+                .setSaveConsumer(value -> config.showTranslationPrefix = value)
+                .build()
+        );
+        general.addEntry(
+            entryBuilder
                 .startDropdownMenu(
                     Text.translatable("chatglot.config.target_language"),
                     selectedLanguageOption,

@@ -25,6 +25,7 @@ public class ChatglotConfig {
     public boolean autoTranslateEnabled = false;
     public boolean autoTranslateEnabledWhenSupported = false;
     public boolean overwriteOriginalWithTranslation = false;
+    public boolean showTranslationPrefix = true;
     public String targetLanguage = "EN";
     public boolean showSourceLanguageTag = true;
 

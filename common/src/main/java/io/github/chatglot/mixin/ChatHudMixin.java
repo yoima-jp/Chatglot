@@ -75,7 +75,8 @@ public abstract class ChatHudMixin {
             return;
         }
 
-        String plain = stripTranslateButtonSuffix(message.getString(), config.translateButtonLabel);
+        Text originalMessage = stripTranslateButton(message, config.translateButtonLabel);
+        String plain = originalMessage == null ? stripTranslateButtonSuffix(message.getString(), config.translateButtonLabel) : originalMessage.getString();
         if (plain.isBlank() || plain.startsWith(ChatglotConstants.INTERNAL_PREFIX)) {
             return;
         }
@@ -92,8 +93,42 @@ public abstract class ChatHudMixin {
                 if (!detected.isBlank() && LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
                     return;
                 }
-                ChatTranslationActions.translateAndPublish(plain, message, detected, true, signature);
+                ChatTranslationActions.translateAndPublish(plain, originalMessage, detected, true, signature);
             });
+    }
+
+    private static Text stripTranslateButton(Text message, String buttonLabel) {
+        if (message == null) {
+            return null;
+        }
+
+        MutableText copy = message.copy();
+        if (copy.getSiblings().isEmpty()) {
+            return copy;
+        }
+
+        Text lastSibling = copy.getSiblings().get(copy.getSiblings().size() - 1);
+        if (!isTranslateButton(lastSibling, buttonLabel)) {
+            return copy;
+        }
+
+        copy.getSiblings().remove(copy.getSiblings().size() - 1);
+        return copy;
+    }
+
+    private static boolean isTranslateButton(Text text, String buttonLabel) {
+        if (text == null || buttonLabel == null || buttonLabel.isBlank()) {
+            return false;
+        }
+
+        String value = text.getString();
+        if (!(" " + buttonLabel).equals(value) && !(" [" + buttonLabel + "]").equals(value)) {
+            return false;
+        }
+
+        ClickEvent clickEvent = text.getStyle().getClickEvent();
+        return clickEvent instanceof ClickEvent.RunCommand runCommand
+            && runCommand.command().startsWith("/chatglot translate ");
     }
 
     private static String stripTranslateButtonSuffix(String value, String buttonLabel) {

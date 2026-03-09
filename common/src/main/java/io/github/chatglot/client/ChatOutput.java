@@ -25,9 +25,16 @@ public final class ChatOutput {
         StyledTranslationTemplate template
     ) {
         String translatedText = result.translatedText() == null ? "" : result.translatedText();
-        MutableText prefix = Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
-            .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY));
-        postTranslation(prefix.append(template.apply(translatedText)), originalText, originalSignature);
+        ChatglotConfig config = ChatglotRuntime.get().configManager().get();
+        MutableText message = Text.empty();
+        if (config.showTranslationPrefix) {
+            message.append(
+                Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
+                    .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY))
+            );
+        }
+        message.append(template.apply(translatedText));
+        postTranslation(message, originalText, originalSignature);
     }
 
     public static void postError(String message) {

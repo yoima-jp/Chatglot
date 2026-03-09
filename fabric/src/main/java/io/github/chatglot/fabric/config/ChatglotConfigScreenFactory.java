@@ -113,7 +113,7 @@ public final class ChatglotConfigScreenFactory {
             config.codexModel,
             ChatglotConfig.CODEX_DEFAULT_MODEL
         );
-        String defaultCodexModel = selectableCodexModels.getFirst();
+        String defaultCodexModel = ChatglotConfig.CODEX_DEFAULT_MODEL;
         String selectedCodexModel = resolveModelFromInput(config.codexModel, selectableCodexModels, defaultCodexModel);
 
         List<String> selectableOpenAiModels = collectModelOptions(
@@ -121,7 +121,7 @@ public final class ChatglotConfigScreenFactory {
             config.openaiModel,
             ChatglotConfig.OPENAI_DEFAULT_MODEL
         );
-        String defaultOpenAiModel = selectableOpenAiModels.getFirst();
+        String defaultOpenAiModel = ChatglotConfig.OPENAI_DEFAULT_MODEL;
         String selectedOpenAiModel = resolveModelFromInput(config.openaiModel, selectableOpenAiModels, defaultOpenAiModel);
 
         List<String> selectableGeminiModels = collectModelOptions(
@@ -129,7 +129,7 @@ public final class ChatglotConfigScreenFactory {
             config.geminiModel,
             ChatglotConfig.GEMINI_DEFAULT_MODEL
         );
-        String defaultGeminiModel = selectableGeminiModels.getFirst();
+        String defaultGeminiModel = ChatglotConfig.GEMINI_DEFAULT_MODEL;
         String selectedGeminiModel = resolveModelFromInput(config.geminiModel, selectableGeminiModels, defaultGeminiModel);
 
         List<String> selectableAnthropicModels = collectModelOptions(
@@ -137,7 +137,7 @@ public final class ChatglotConfigScreenFactory {
             config.anthropicModel,
             ChatglotConfig.ANTHROPIC_DEFAULT_MODEL
         );
-        String defaultAnthropicModel = selectableAnthropicModels.getFirst();
+        String defaultAnthropicModel = ChatglotConfig.ANTHROPIC_DEFAULT_MODEL;
         String selectedAnthropicModel = resolveModelFromInput(
             config.anthropicModel,
             selectableAnthropicModels,
@@ -398,23 +398,41 @@ public final class ChatglotConfigScreenFactory {
     }
 
     private static List<String> collectModelOptions(List<String> cachedModels, String configuredModel, String defaultModel) {
-        List<String> options = new ArrayList<>(cachedModels);
+        List<String> options = new ArrayList<>();
+
+        String normalizedDefault = normalizeModelValue(defaultModel);
+        if (!normalizedDefault.isBlank()) {
+            addModelOptionUnique(options, normalizedDefault);
+        }
+
+        for (String cachedModel : cachedModels) {
+            addModelOptionUnique(options, cachedModel);
+        }
 
         String current = normalizeModelValue(configuredModel);
-        if (current.isBlank()) {
-            current = defaultModel;
+        if (!current.isBlank()) {
+            addModelOptionUnique(options, current);
         }
 
         if (options.isEmpty()) {
-            options.add(current);
-            return options;
+            addModelOptionUnique(options, defaultModel);
         }
 
-        Set<String> known = Set.copyOf(options);
-        if (!known.contains(current)) {
-            options.addFirst(current);
-        }
         return options;
+    }
+
+    private static void addModelOptionUnique(List<String> options, String candidate) {
+        String normalized = normalizeModelValue(candidate);
+        if (normalized.isBlank()) {
+            return;
+        }
+
+        for (String existing : options) {
+            if (existing.equalsIgnoreCase(normalized)) {
+                return;
+            }
+        }
+        options.add(normalized);
     }
 
     private static String resolveModelFromInput(String input, List<String> options, String fallback) {
@@ -687,3 +705,4 @@ public final class ChatglotConfigScreenFactory {
         return normalizeLanguageCode(optionCode);
     }
 }
+

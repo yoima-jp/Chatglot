@@ -48,7 +48,7 @@ public abstract class ChatHudMixin {
             return message;
         }
 
-        int id = ChatglotRuntime.get().requestStore().register(plain, signature);
+        int id = ChatglotRuntime.get().requestStore().register(plain, message, signature);
         MutableText button = Text.literal(" " + config.translateButtonLabel)
             .setStyle(
                 Style.EMPTY
@@ -92,7 +92,7 @@ public abstract class ChatHudMixin {
                 if (!detected.isBlank() && LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
                     return;
                 }
-                ChatTranslationActions.translateAndPublish(plain, detected, true, signature);
+                ChatTranslationActions.translateAndPublish(plain, message, detected, true, signature);
             });
     }
 

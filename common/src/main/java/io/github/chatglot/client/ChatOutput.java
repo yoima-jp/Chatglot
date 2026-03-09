@@ -18,11 +18,16 @@ public final class ChatOutput {
     private ChatOutput() {
     }
 
-    public static void postTranslation(TranslationResult result, String originalText, MessageSignatureData originalSignature) {
+    public static void postTranslation(
+        TranslationResult result,
+        String originalText,
+        MessageSignatureData originalSignature,
+        StyledTranslationTemplate template
+    ) {
         String translatedText = result.translatedText() == null ? "" : result.translatedText();
         MutableText prefix = Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
             .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY));
-        postTranslation(prefix.append(Text.literal(translatedText).formatted(Formatting.WHITE)), originalText, originalSignature);
+        postTranslation(prefix.append(template.apply(translatedText)), originalText, originalSignature);
     }
 
     public static void postError(String message) {

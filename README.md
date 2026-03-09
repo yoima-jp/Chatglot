@@ -66,6 +66,7 @@ macOS / Linux の場合:
   初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
 - `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure`
 - `requestTimeoutSeconds`: 通信タイムアウト秒（5〜240）
+- `maxConcurrentTranslations`: 同時に進める翻訳数の上限（1〜16）
 
 プロバイダ固有設定:
 

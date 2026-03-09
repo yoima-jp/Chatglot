@@ -12,6 +12,7 @@ final class TranslationPromptBuilder {
             .append(request.targetLanguage())
             .append(". ")
             .append("Preserve player names, commands, URLs, placeholders, and formatting markers when possible. ")
+            .append("If markers like [[CGT_0]]...[[/CGT_0]] appear, keep the markers exactly as-is and place translated text only between the matching markers. ")
             .append("Return only translated text without explanations.");
 
         if (request.sourceLanguageHint() != null && !request.sourceLanguageHint().isBlank()) {

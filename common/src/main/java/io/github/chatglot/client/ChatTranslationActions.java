@@ -6,6 +6,7 @@ import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.TranslationException;
 import java.util.concurrent.CompletionException;
 import net.minecraft.network.message.MessageSignatureData;
+import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,11 +17,12 @@ public final class ChatTranslationActions {
     }
 
     public static void translateAndPublish(String originalText, String sourceLanguageHint, boolean automatic) {
-        translateAndPublish(originalText, sourceLanguageHint, automatic, null);
+        translateAndPublish(originalText, null, sourceLanguageHint, automatic, null);
     }
 
     public static void translateAndPublish(
         String originalText,
+        Text originalMessage,
         String sourceLanguageHint,
         boolean automatic,
         MessageSignatureData originalSignature
@@ -32,9 +34,10 @@ public final class ChatTranslationActions {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         ChatglotConfig config = runtime.configManager().get();
         String resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
+        StyledTranslationTemplate template = StyledTranslationTemplate.create(originalMessage, originalText);
         runtime.translationService()
-            .translate(originalText, resolvedTargetLanguage, sourceLanguageHint, automatic)
-            .thenAccept(result -> ChatOutput.postTranslation(result, originalText, originalSignature))
+            .translate(template.markedText(), resolvedTargetLanguage, sourceLanguageHint, automatic)
+            .thenAccept(result -> ChatOutput.postTranslation(result, originalText, originalSignature, template))
             .exceptionally(error -> {
                 Throwable unwrapped = unwrap(error);
                 LOGGER.warn("Translation failed", unwrapped);

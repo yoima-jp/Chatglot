@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.network.message.MessageSignatureData;
+import net.minecraft.text.Text;
 
 public final class TranslationRequestStore {
     private final AtomicInteger idSequence = new AtomicInteger(0);
@@ -15,12 +16,25 @@ public final class TranslationRequestStore {
     private final Deque<Integer> insertionOrder = new ArrayDeque<>();
 
     public synchronized int register(String originalText) {
-        return register(originalText, null);
+        return register(originalText, null, null);
     }
 
     public synchronized int register(String originalText, MessageSignatureData signature) {
+        return register(originalText, null, signature);
+    }
+
+    public synchronized int register(String originalText, Text originalMessage, MessageSignatureData signature) {
         int id = idSequence.updateAndGet(prev -> prev >= 999_999 ? 1 : prev + 1);
-        requests.put(id, new StoredRequest(id, originalText, signature, Instant.now().toEpochMilli()));
+        requests.put(
+            id,
+            new StoredRequest(
+                id,
+                originalText,
+                originalMessage == null ? null : originalMessage.copy(),
+                signature,
+                Instant.now().toEpochMilli()
+            )
+        );
         insertionOrder.addLast(id);
 
         while (insertionOrder.size() > ChatglotConstants.MAX_STORED_MESSAGE_ACTIONS) {
@@ -37,6 +51,12 @@ public final class TranslationRequestStore {
         return Optional.ofNullable(requests.get(id));
     }
 
-    public record StoredRequest(int id, String originalText, MessageSignatureData signature, long createdAtMillis) {
+    public record StoredRequest(
+        int id,
+        String originalText,
+        Text originalMessage,
+        MessageSignatureData signature,
+        long createdAtMillis
+    ) {
     }
 }

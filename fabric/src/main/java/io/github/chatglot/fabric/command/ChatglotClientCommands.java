@@ -39,7 +39,13 @@ public final class ChatglotClientCommands {
         return runtime.requestStore().find(id)
             .map(found -> {
                 playTranslateClickSound();
-                ChatTranslationActions.translateAndPublish(found.originalText(), "", false, found.signature());
+                ChatTranslationActions.translateAndPublish(
+                    found.originalText(),
+                    found.originalMessage(),
+                    "",
+                    false,
+                    found.signature()
+                );
                 return 1;
             })
             .orElseGet(() -> {

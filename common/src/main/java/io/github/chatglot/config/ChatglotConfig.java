@@ -54,6 +54,7 @@ public class ChatglotConfig {
     public String azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
 
     public int requestTimeoutSeconds = 45;
+    public int maxConcurrentTranslations = 1;
 
     public static String normalizeCodexReasoningEffort(String effort) {
         if (effort == null || effort.isBlank()) {
@@ -106,6 +107,12 @@ public class ChatglotConfig {
         }
         if (requestTimeoutSeconds > 240) {
             requestTimeoutSeconds = 240;
+        }
+        if (maxConcurrentTranslations < 1) {
+            maxConcurrentTranslations = 1;
+        }
+        if (maxConcurrentTranslations > 16) {
+            maxConcurrentTranslations = 16;
         }
 
         if (deeplApiKey == null) {

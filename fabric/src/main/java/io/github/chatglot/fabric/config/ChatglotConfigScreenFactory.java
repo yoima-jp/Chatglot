@@ -319,6 +319,13 @@ function jsonResponse(obj) {
                 .setSaveConsumer(value -> config.requestTimeoutSeconds = value)
                 .build()
         );
+        general.addEntry(
+            entryBuilder
+                .startIntField(Text.translatable("chatglot.config.max_concurrent_translations"), config.maxConcurrentTranslations)
+                .setDefaultValue(1)
+                .setSaveConsumer(value -> config.maxConcurrentTranslations = value)
+                .build()
+        );
 
         // Keep provider tabs in requested order.
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));

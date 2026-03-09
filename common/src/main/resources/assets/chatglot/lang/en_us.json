@@ -35,6 +35,7 @@
   "chatglot.config.provider.azure": "Azure Translator",
   "chatglot.config.provider_notice": "Default (Free GAS) is rate-limited and auto-translate is unavailable. If it gets slow or fails when busy, switch to Google Apps Script (GAS) and set your own GAS URL (still free).",
   "chatglot.config.request_timeout": "Request timeout seconds",
+  "chatglot.config.max_concurrent_translations": "Max concurrent translations",
   "chatglot.config.deepl_key": "DeepL API key",
   "chatglot.config.deepl_get_api_key": "Get DeepL API key",
   "chatglot.config.deepl_free": "Use DeepL Free endpoint",

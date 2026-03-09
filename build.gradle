@@ -4,13 +4,18 @@ plugins {
     id 'com.gradleup.shadow' version '8.3.8' apply false
 }
 
+def buildDate = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tokyo"))
+    .format(java.time.format.DateTimeFormatter.ofPattern("yy.MM.dd"))
+def computedModVersion = "${buildDate}-mc${minecraft_version}"
+rootProject.ext.set("mod_version", computedModVersion)
+
 architectury {
     minecraft = project.minecraft_version
 }
 
 allprojects {
     group = rootProject.maven_group
-    version = rootProject.mod_version
+    version = rootProject.ext.mod_version
 }
 
 subprojects {
@@ -66,7 +71,8 @@ subprojects {
     }
 
     processResources {
-        def props = providers.gradlePropertiesPrefixedBy('').get()
+        def props = new LinkedHashMap(providers.gradlePropertiesPrefixedBy('').get())
+        props.put("mod_version", rootProject.version.toString())
         inputs.properties(props)
         filesMatching(['*.mixins.json', '*.mod.json', 'META-INF/*mods.toml']) {
             expand(props)

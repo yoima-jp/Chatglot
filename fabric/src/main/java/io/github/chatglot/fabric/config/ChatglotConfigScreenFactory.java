@@ -1,14 +1,18 @@
 package io.github.chatglot.fabric.config;
 
 import io.github.chatglot.ChatglotRuntime;
+import io.github.chatglot.ChatglotConstants;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.fabric.config.entry.CodexAuthButtonEntry;
 import io.github.chatglot.translation.LanguageUtil;
+import io.github.chatglot.translation.provider.codex.CodexOAuthService;
+import io.github.chatglot.translation.provider.codex.CodexTokenStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.nio.file.Path;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
@@ -98,6 +102,7 @@ function jsonResponse(obj) {
 }
 """;
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
+    private static final String CODEX_TOKEN_FILENAME = "codex_tokens.json";
 
     private enum ProviderOption {
         DEFAULT("default"),
@@ -250,14 +255,18 @@ function jsonResponse(obj) {
         );
         general.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.button_label"), config.translateButtonLabel)
-                .setDefaultValue("✍️")
+                .setDefaultValue(ChatglotConfig.DEFAULT_TRANSLATE_BUTTON_LABEL)
                 .setSaveConsumer(value -> config.translateButtonLabel = value)
                 .build()
         );
         general.addEntry(
             entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.auto_translate"), config.autoTranslateEnabled)
                 .setDefaultValue(false)
-                .setSaveConsumer(value -> config.autoTranslateEnabled = value)
+                .setSaveConsumer(value -> {
+                    ProviderOption currentProvider = ProviderOption.fromConfigValue(config.provider);
+                    config.autoTranslateEnabledWhenSupported = value;
+                    config.autoTranslateEnabled = currentProvider != ProviderOption.DEFAULT && value;
+                })
                 .build()
         );
         general.addEntry(
@@ -293,7 +302,12 @@ function jsonResponse(obj) {
                 .setSaveConsumer(value -> {
                     config.provider = value.id();
                     if (value == ProviderOption.DEFAULT) {
+                        if (config.autoTranslateEnabled) {
+                            config.autoTranslateEnabledWhenSupported = true;
+                        }
                         config.autoTranslateEnabled = false;
+                    } else if (config.autoTranslateEnabledWhenSupported) {
+                        config.autoTranslateEnabled = true;
                     }
                 })
                 .build()
@@ -398,6 +412,12 @@ function jsonResponse(obj) {
                 .setSuggestionMode(true)
                 .setSaveConsumer(value -> config.codexModel = normalizeModelValue(value))
                 .build()
+        );
+        codex.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.codex_auth_start"),
+                () -> startCodexAuthFlow(runtime, config, parent)
+            )
         );
         codex.addEntry(
             new CodexAuthButtonEntry(
@@ -652,6 +672,63 @@ function jsonResponse(obj) {
                 );
             }
         }
+    }
+
+    private static void startCodexAuthFlow(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client.player != null) {
+            client.player.sendMessage(Text.translatable("chatglot.config.codex_auth_starting"), false);
+        }
+
+        Thread authThread = new Thread(() -> {
+            try {
+                Path tokenFile = resolveCodexTokenFile(runtime, config);
+                new CodexOAuthService().authenticateInBrowser(tokenFile);
+                try {
+                    if (new CodexTokenStore().read(tokenFile) != null) {
+                        runtime.codexModelCatalogService().refreshModels();
+                    }
+                } catch (Exception e) {
+                    LOGGER.warn("Codex auth succeeded but model refresh failed: {}", e.getMessage());
+                }
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(
+                            Text.translatable("chatglot.config.codex_auth_start.success", tokenFile.toString()),
+                            false
+                        );
+                    }
+                    client.setScreen(create(parent));
+                });
+            } catch (Exception e) {
+                LOGGER.warn("Failed to complete Codex OAuth flow: {}", e.getMessage());
+                if (isSupersededCodexAuth(e)) {
+                    return;
+                }
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(
+                            Text.translatable("chatglot.config.codex_auth_start.failed", e.getMessage()),
+                            false
+                        );
+                    }
+                });
+            }
+        }, "chatglot-codex-auth");
+        authThread.setDaemon(true);
+        authThread.start();
+    }
+
+    private static boolean isSupersededCodexAuth(Exception e) {
+        String message = e.getMessage();
+        return message != null && message.contains("a new authorization started");
+    }
+
+    private static Path resolveCodexTokenFile(ChatglotRuntime runtime, ChatglotConfig config) {
+        if (config.codexTokenFile != null && !config.codexTokenFile.isBlank()) {
+            return Path.of(config.codexTokenFile.trim());
+        }
+        return runtime.configDir().resolve(ChatglotConstants.MOD_ID).resolve(CODEX_TOKEN_FILENAME);
     }
 
     private static void refreshOpenAiModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {

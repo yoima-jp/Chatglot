@@ -89,7 +89,7 @@ public abstract class ChatHudMixin {
             .detectLanguageAsync(plain)
             .thenAccept(detectedLanguage -> {
                 String detected = detectedLanguage.orElse("");
-                if (detected.isBlank() || LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
+                if (!detected.isBlank() && LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
                     return;
                 }
                 ChatTranslationActions.translateAndPublish(plain, detected, true, signature);

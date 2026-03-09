@@ -14,6 +14,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -30,6 +31,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,6 +44,9 @@ public final class CodexOAuthService {
     private static final String OAUTH_SCOPE = "openid profile email offline_access";
     private static final int OAUTH_PORT = 1455;
     private static final int OAUTH_TIMEOUT_SECONDS = 300;
+    private static final Object OAUTH_SESSION_LOCK = new Object();
+
+    private static OAuthSession activeSession;
 
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final CodexTokenStore tokenStore = new CodexTokenStore();
@@ -68,18 +73,26 @@ public final class CodexOAuthService {
         return fresh;
     }
 
+    public CodexAuthTokens authenticateInBrowser(Path tokenFile) throws TranslationException {
+        CodexAuthTokens fresh = runBrowserOAuth();
+        tokenStore.write(tokenFile, fresh);
+        return fresh;
+    }
+
     private CodexAuthTokens runBrowserOAuth() throws TranslationException {
         String verifier = generateCodeVerifier();
         String challenge = sha256Base64Url(verifier);
         String state = randomState();
         String redirectUri = "http://localhost:" + OAUTH_PORT + "/auth/callback";
         String authorizeUrl = buildAuthorizeUrl(redirectUri, challenge, state);
+        OAuthSession session = replaceActiveSession();
 
         LOGGER.info("Starting Codex OAuth flow. URL={}", authorizeUrl);
         try (ServerSocket server = new ServerSocket()) {
+            session.attach(server);
             server.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), OAUTH_PORT));
             openBrowser(authorizeUrl);
-            OAuthCallback callback = waitForCallback(server, state, Duration.ofSeconds(OAUTH_TIMEOUT_SECONDS));
+            OAuthCallback callback = waitForCallback(server, state, Duration.ofSeconds(OAUTH_TIMEOUT_SECONDS), session);
             if (callback.error() != null) {
                 throw new TranslationException("OAuth failed: " + callback.error());
             }
@@ -88,6 +101,8 @@ public final class CodexOAuthService {
             throw new TranslationException("OAuth callback port " + OAUTH_PORT + " is unavailable.", e);
         } catch (IOException e) {
             throw new TranslationException("Failed to run OAuth callback server.", e);
+        } finally {
+            clearActiveSession(session);
         }
     }
 
@@ -137,7 +152,8 @@ public final class CodexOAuthService {
         }
     }
 
-    private OAuthCallback waitForCallback(ServerSocket server, String expectedState, Duration timeout) throws TranslationException {
+    private OAuthCallback waitForCallback(ServerSocket server, String expectedState, Duration timeout, OAuthSession session)
+        throws TranslationException {
         long deadlineNanos = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < deadlineNanos) {
             long remainingMillis = Duration.ofNanos(deadlineNanos - System.nanoTime()).toMillis();
@@ -152,9 +168,20 @@ public final class CodexOAuthService {
                 }
             } catch (SocketTimeoutException e) {
                 break;
+            } catch (SocketException e) {
+                if (session.isCancelled()) {
+                    throw new TranslationException("OAuth flow was cancelled because a new authorization started.", e);
+                }
+                throw new TranslationException("Failed to receive OAuth callback.", e);
             } catch (IOException e) {
+                if (session.isCancelled()) {
+                    throw new TranslationException("OAuth flow was cancelled because a new authorization started.", e);
+                }
                 throw new TranslationException("Failed to receive OAuth callback.", e);
             }
+        }
+        if (session.isCancelled()) {
+            throw new TranslationException("OAuth flow was cancelled because a new authorization started.");
         }
         throw new TranslationException("OAuth callback timeout after " + timeout.toSeconds() + " seconds.");
     }
@@ -321,15 +348,43 @@ public final class CodexOAuthService {
     }
 
     private static void openBrowser(String url) throws TranslationException {
+        Exception desktopFailure = null;
         try {
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 Desktop.getDesktop().browse(URI.create(url));
                 return;
             }
         } catch (Exception e) {
+            desktopFailure = e;
+        }
+
+        try {
+            Util.getOperatingSystem().open(url);
+            return;
+        } catch (Exception e) {
+            if (desktopFailure != null) {
+                e.addSuppressed(desktopFailure);
+            }
             throw new TranslationException("Failed to open browser for OAuth. URL: " + url, e);
         }
-        throw new TranslationException("Cannot open browser automatically. Open manually: " + url);
+    }
+
+    private static OAuthSession replaceActiveSession() {
+        synchronized (OAUTH_SESSION_LOCK) {
+            if (activeSession != null) {
+                activeSession.cancel();
+            }
+            activeSession = new OAuthSession();
+            return activeSession;
+        }
+    }
+
+    private static void clearActiveSession(OAuthSession session) {
+        synchronized (OAUTH_SESSION_LOCK) {
+            if (activeSession == session) {
+                activeSession = null;
+            }
+        }
     }
 
     private static String generateCodeVerifier() {
@@ -432,6 +487,38 @@ public final class CodexOAuthService {
             return "";
         }
         return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
+    }
+
+    private static final class OAuthSession {
+        private volatile boolean cancelled;
+        private volatile ServerSocket server;
+
+        void attach(ServerSocket server) {
+            this.server = server;
+            if (cancelled) {
+                closeServer(server);
+            }
+        }
+
+        boolean isCancelled() {
+            return cancelled;
+        }
+
+        void cancel() {
+            cancelled = true;
+            closeServer(server);
+        }
+
+        private static void closeServer(ServerSocket server) {
+            if (server == null) {
+                return;
+            }
+            try {
+                server.close();
+            } catch (IOException ignored) {
+                // Best effort only.
+            }
+        }
     }
 
     private record OAuthCallback(String code, String error) {

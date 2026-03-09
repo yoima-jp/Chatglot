@@ -101,14 +101,14 @@ function jsonResponse(obj) {
 
     private enum ProviderOption {
         DEFAULT("default"),
+        GAS("gas"),
         DEEPL("deepl"),
         GOOGLE("google"),
-        GAS("gas"),
         CODEX("codex"),
+        AZURE("azure"),
         OPENAI("openai"),
         GEMINI("gemini"),
-        ANTHROPIC("anthropic"),
-        AZURE("azure");
+        ANTHROPIC("anthropic");
 
         private final String id;
 
@@ -127,13 +127,14 @@ function jsonResponse(obj) {
 
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
                 case "default" -> DEFAULT;
-                case "google" -> GOOGLE;
                 case "gas" -> GAS;
+                case "deepl" -> DEEPL;
+                case "google" -> GOOGLE;
                 case "codex" -> CODEX;
+                case "azure" -> AZURE;
                 case "openai" -> OPENAI;
                 case "gemini" -> GEMINI;
                 case "anthropic" -> ANTHROPIC;
-                case "azure" -> AZURE;
                 default -> DEFAULT;
             };
         }
@@ -297,12 +298,23 @@ function jsonResponse(obj) {
                 })
                 .build()
         );
+        general.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.provider_notice")).build());
         general.addEntry(
             entryBuilder.startIntField(Text.translatable("chatglot.config.request_timeout"), config.requestTimeoutSeconds)
                 .setDefaultValue(45)
                 .setSaveConsumer(value -> config.requestTimeoutSeconds = value)
                 .build()
         );
+
+        // Keep provider tabs in requested order.
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.google"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
 
         ConfigCategory deepL = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
         deepL.addEntry(
@@ -339,7 +351,6 @@ function jsonResponse(obj) {
         );
 
         ConfigCategory gas = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.gas_notice")).build());
         gas.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.gas_webapp_url"), config.gasWebAppUrl)
                 .setDefaultValue("")

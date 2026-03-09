@@ -350,6 +350,13 @@ function jsonResponse(obj) {
                 () -> Util.getOperatingSystem().open(GAS_APPS_SCRIPT_HOME_URL)
             )
         );
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step1")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step2")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step3")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step4")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step5")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step6")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step7")).build());
 
         ConfigCategory codex = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
         codex.addEntry(

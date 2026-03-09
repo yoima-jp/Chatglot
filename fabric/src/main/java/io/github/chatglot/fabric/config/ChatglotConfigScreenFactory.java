@@ -100,6 +100,7 @@ function jsonResponse(obj) {
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
 
     private enum ProviderOption {
+        DEFAULT("default"),
         DEEPL("deepl"),
         GOOGLE("google"),
         GAS("gas"),
@@ -121,10 +122,11 @@ function jsonResponse(obj) {
 
         private static ProviderOption fromConfigValue(String value) {
             if (value == null || value.isBlank()) {
-                return DEEPL;
+                return DEFAULT;
             }
 
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
+                case "default" -> DEFAULT;
                 case "google" -> GOOGLE;
                 case "gas" -> GAS;
                 case "codex" -> CODEX;
@@ -132,7 +134,7 @@ function jsonResponse(obj) {
                 case "gemini" -> GEMINI;
                 case "anthropic" -> ANTHROPIC;
                 case "azure" -> AZURE;
-                default -> DEEPL;
+                default -> DEFAULT;
             };
         }
     }
@@ -285,9 +287,14 @@ function jsonResponse(obj) {
         ProviderOption providerOption = ProviderOption.fromConfigValue(config.provider);
         general.addEntry(
             entryBuilder.startEnumSelector(Text.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
-                .setDefaultValue(ProviderOption.DEEPL)
+                .setDefaultValue(ProviderOption.DEFAULT)
                 .setEnumNameProvider(option -> Text.translatable("chatglot.config.provider." + option.name().toLowerCase(Locale.ROOT)))
-                .setSaveConsumer(value -> config.provider = value.id())
+                .setSaveConsumer(value -> {
+                    config.provider = value.id();
+                    if (value == ProviderOption.DEFAULT) {
+                        config.autoTranslateEnabled = false;
+                    }
+                })
                 .build()
         );
         general.addEntry(
@@ -332,6 +339,7 @@ function jsonResponse(obj) {
         );
 
         ConfigCategory gas = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
+        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.gas_notice")).build());
         gas.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.gas_webapp_url"), config.gasWebAppUrl)
                 .setDefaultValue("")

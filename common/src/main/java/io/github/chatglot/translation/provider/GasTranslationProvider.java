@@ -28,7 +28,8 @@ public final class GasTranslationProvider implements TranslationProvider {
     @Override
     public TranslationResult translate(TranslationRequest request, ChatglotConfig config, Path configDir, Path gameDir)
         throws TranslationException {
-        if (config.gasWebAppUrl == null || config.gasWebAppUrl.isBlank()) {
+        String endpoint = resolveEndpoint(config);
+        if (endpoint.isBlank()) {
             throw new TranslationException("GAS Web App URL is empty. Set it in Chatglot config.");
         }
 
@@ -41,7 +42,7 @@ public final class GasTranslationProvider implements TranslationProvider {
 
         try {
             HttpResponse<String> response = sendWithRedirects(
-                config.gasWebAppUrl.trim(),
+                endpoint,
                 payload.toString(),
                 config.requestTimeoutSeconds
             );
@@ -92,6 +93,19 @@ public final class GasTranslationProvider implements TranslationProvider {
         } catch (Exception e) {
             throw new TranslationException("GAS translation request failed", e);
         }
+    }
+
+    private static String resolveEndpoint(ChatglotConfig config) {
+        if (config == null) {
+            return "";
+        }
+        if (ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(config.provider)) {
+            return ChatglotConfig.GAS_DEFAULT_WEB_APP_URL;
+        }
+        if (config.gasWebAppUrl == null) {
+            return "";
+        }
+        return config.gasWebAppUrl.trim();
     }
 
     private HttpResponse<String> sendWithRedirects(String url, String requestBody, int timeoutSeconds) throws Exception {

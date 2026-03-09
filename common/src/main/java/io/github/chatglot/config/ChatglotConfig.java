@@ -3,6 +3,8 @@ package io.github.chatglot.config;
 import java.util.Locale;
 
 public class ChatglotConfig {
+    public static final String DEFAULT_TRANSLATE_BUTTON_LABEL = "✍";
+    public static final String LEGACY_TRANSLATE_BUTTON_LABEL = "✍️";
     public static final String DEFAULT_PROVIDER = "default";
     public static final String GAS_DEFAULT_WEB_APP_URL =
         "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
@@ -19,10 +21,12 @@ public class ChatglotConfig {
 
     public boolean enabled = true;
     public boolean appendTranslateButton = true;
-    public String translateButtonLabel = "✍️";
+    public String translateButtonLabel = DEFAULT_TRANSLATE_BUTTON_LABEL;
 
     public boolean autoTranslateEnabled = false;
+    public boolean autoTranslateEnabledWhenSupported = false;
     public boolean overwriteOriginalWithTranslation = false;
+    public boolean showTranslationPrefix = true;
     public String targetLanguage = "EN";
     public boolean showSourceLanguageTag = true;
 
@@ -52,6 +56,7 @@ public class ChatglotConfig {
     public String azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
 
     public int requestTimeoutSeconds = 45;
+    public int maxConcurrentTranslations = 1;
 
     public static String normalizeCodexReasoningEffort(String effort) {
         if (effort == null || effort.isBlank()) {
@@ -68,8 +73,15 @@ public class ChatglotConfig {
     }
 
     public void sanitize() {
-        if (translateButtonLabel == null || translateButtonLabel.isBlank()) {
-            translateButtonLabel = "✍️";
+        if (
+            translateButtonLabel == null
+                || translateButtonLabel.isBlank()
+                || LEGACY_TRANSLATE_BUTTON_LABEL.equals(translateButtonLabel)
+        ) {
+            translateButtonLabel = DEFAULT_TRANSLATE_BUTTON_LABEL;
+        }
+        if (autoTranslateEnabled) {
+            autoTranslateEnabledWhenSupported = true;
         }
         if (targetLanguage == null || targetLanguage.isBlank()) {
             targetLanguage = "EN";
@@ -101,6 +113,12 @@ public class ChatglotConfig {
         }
         if (requestTimeoutSeconds > 240) {
             requestTimeoutSeconds = 240;
+        }
+        if (maxConcurrentTranslations < 1) {
+            maxConcurrentTranslations = 1;
+        }
+        if (maxConcurrentTranslations > 16) {
+            maxConcurrentTranslations = 16;
         }
 
         if (deeplApiKey == null) {
@@ -157,8 +175,7 @@ public class ChatglotConfig {
         }
         codexReasoningSummary = codexReasoningSummary.trim();
 
-        if (DEFAULT_PROVIDER.equals(provider)) {
-            autoTranslateEnabled = false;
-        }
+        autoTranslateEnabled = autoTranslateEnabledWhenSupported && !DEFAULT_PROVIDER.equals(provider);
+
     }
 }

@@ -6,6 +6,8 @@ import io.github.chatglot.client.ChatMessagePipelineGuard;
 import io.github.chatglot.client.ChatTranslationActions;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
+import java.util.ArrayList;
+import java.util.List;
 import net.minecraft.client.gui.hud.ChatHud;
 import net.minecraft.client.gui.hud.MessageIndicator;
 import net.minecraft.network.message.MessageSignatureData;
@@ -48,7 +50,7 @@ public abstract class ChatHudMixin {
             return message;
         }
 
-        int id = ChatglotRuntime.get().requestStore().register(plain, signature);
+        int id = ChatglotRuntime.get().requestStore().register(plain, message, signature);
         MutableText button = Text.literal(" " + config.translateButtonLabel)
             .setStyle(
                 Style.EMPTY
@@ -75,7 +77,8 @@ public abstract class ChatHudMixin {
             return;
         }
 
-        String plain = stripTranslateButtonSuffix(message.getString(), config.translateButtonLabel);
+        Text originalMessage = stripTranslateButton(message, config.translateButtonLabel);
+        String plain = originalMessage == null ? stripTranslateButtonSuffix(message.getString(), config.translateButtonLabel) : originalMessage.getString();
         if (plain.isBlank() || plain.startsWith(ChatglotConstants.INTERNAL_PREFIX)) {
             return;
         }
@@ -89,11 +92,52 @@ public abstract class ChatHudMixin {
             .detectLanguageAsync(plain)
             .thenAccept(detectedLanguage -> {
                 String detected = detectedLanguage.orElse("");
-                if (detected.isBlank() || LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
+                if (!detected.isBlank() && LanguageUtil.isSameLanguage(detected, resolvedTargetLanguage)) {
                     return;
                 }
-                ChatTranslationActions.translateAndPublish(plain, detected, true, signature);
+                ChatTranslationActions.translateAndPublish(plain, originalMessage, detected, true, signature);
             });
+    }
+
+    private static Text stripTranslateButton(Text message, String buttonLabel) {
+        if (message == null) {
+            return null;
+        }
+
+        MutableText copy = message.copy();
+        if (copy.getSiblings().isEmpty()) {
+            return copy;
+        }
+
+        Text lastSibling = copy.getSiblings().get(copy.getSiblings().size() - 1);
+        if (!isTranslateButton(lastSibling, buttonLabel)) {
+            return copy;
+        }
+
+        copy.getSiblings().remove(copy.getSiblings().size() - 1);
+        return copy;
+    }
+
+    private static boolean isTranslateButton(Text text, String buttonLabel) {
+        if (text == null || buttonLabel == null || buttonLabel.isBlank()) {
+            return false;
+        }
+
+        String value = text.getString();
+        boolean matchesLabel = false;
+        for (String candidateLabel : resolveAcceptedButtonLabels(buttonLabel)) {
+            if ((" " + candidateLabel).equals(value) || (" [" + candidateLabel + "]").equals(value)) {
+                matchesLabel = true;
+                break;
+            }
+        }
+        if (!matchesLabel) {
+            return false;
+        }
+
+        ClickEvent clickEvent = text.getStyle().getClickEvent();
+        return clickEvent instanceof ClickEvent.RunCommand runCommand
+            && runCommand.command().startsWith("/chatglot translate ");
     }
 
     private static String stripTranslateButtonSuffix(String value, String buttonLabel) {
@@ -107,6 +151,17 @@ public abstract class ChatHudMixin {
             return value.substring(0, value.length() - legacySuffix.length());
         }
         return value;
+    }
+
+    private static List<String> resolveAcceptedButtonLabels(String buttonLabel) {
+        List<String> labels = new ArrayList<>();
+        if (buttonLabel != null && !buttonLabel.isBlank()) {
+            labels.add(buttonLabel);
+        }
+        if (ChatglotConfig.DEFAULT_TRANSLATE_BUTTON_LABEL.equals(buttonLabel)) {
+            labels.add(ChatglotConfig.LEGACY_TRANSLATE_BUTTON_LABEL);
+        }
+        return labels;
     }
 
     private static boolean isAutoTranslateProviderSupported(String providerId) {

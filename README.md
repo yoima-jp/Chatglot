@@ -5,7 +5,7 @@ Chatglot は Minecraft チャットを翻訳する Fabric クライアント MOD
 
 ## 主な機能
 
-- チャット末尾に翻訳ボタンを付与（既定ラベル: `✍️`）
+- チャット末尾に翻訳ボタンを付与（既定ラベル: `✍`）
 - ボタンクリックまたはコマンドで個別翻訳
 - 自動翻訳（Lingua による言語判定）
 - 翻訳結果を新規行表示、または原文チャットを置換
@@ -43,7 +43,7 @@ macOS / Linux の場合:
 
 ## 操作方法
 
-- チャットメッセージ末尾の `✍️`（既定）をクリックして翻訳
+- チャットメッセージ末尾の `✍`（既定）をクリックして翻訳
 - `/chatglot translate <id>` で指定IDのメッセージを翻訳
 - `/chatglot config` で設定画面を開く
 - `/chatglot save` で設定を保存
@@ -59,13 +59,15 @@ macOS / Linux の場合:
 
 - `enabled`: MOD全体の有効/無効
 - `appendTranslateButton`: 翻訳ボタンをチャットへ追加
-- `translateButtonLabel`: ボタンラベル（既定 `✍️`）
+- `translateButtonLabel`: ボタンラベル（既定 `✍`）
 - `autoTranslateEnabled`: 自動翻訳の有効/無効
 - `overwriteOriginalWithTranslation`: 原文置換モード
+- `showTranslationPrefix`: `【翻訳】➡` プレフィックスの表示/非表示
 - `targetLanguage`: 例 `JA`, `EN`, `EN-US`, `ZH-HANS`  
   初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
 - `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure`
 - `requestTimeoutSeconds`: 通信タイムアウト秒（5〜240）
+- `maxConcurrentTranslations`: 同時に進める翻訳数の上限（1〜16）
 
 プロバイダ固有設定:
 

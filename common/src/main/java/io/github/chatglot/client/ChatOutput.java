@@ -5,6 +5,7 @@ import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.mixin.ChatHudAccessor;
 import io.github.chatglot.translation.TranslationResult;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.hud.ChatHud;
@@ -18,11 +19,23 @@ public final class ChatOutput {
     private ChatOutput() {
     }
 
-    public static void postTranslation(TranslationResult result, String originalText, MessageSignatureData originalSignature) {
+    static void postTranslation(
+        TranslationResult result,
+        String originalText,
+        MessageSignatureData originalSignature,
+        StyledTranslationTemplate template
+    ) {
         String translatedText = result.translatedText() == null ? "" : result.translatedText();
-        MutableText prefix = Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
-            .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY));
-        postTranslation(prefix.append(Text.literal(translatedText).formatted(Formatting.WHITE)), originalText, originalSignature);
+        ChatglotConfig config = ChatglotRuntime.get().configManager().get();
+        MutableText message = Text.empty();
+        if (config.showTranslationPrefix) {
+            message.append(
+                Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
+                    .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY))
+            );
+        }
+        message.append(template.apply(translatedText));
+        postTranslation(message, originalText, originalSignature);
     }
 
     public static void postError(String message) {
@@ -158,7 +171,12 @@ public final class ChatOutput {
             return true;
         }
 
-        return stripTranslateButtonSuffix(content, buttonLabel).equals(originalText);
+        for (String candidateLabel : resolveAcceptedButtonLabels(buttonLabel)) {
+            if (stripTranslateButtonSuffix(content, candidateLabel).equals(originalText)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String stripTranslateButtonSuffix(String value, String buttonLabel) {
@@ -177,5 +195,16 @@ public final class ChatOutput {
         }
 
         return value;
+    }
+
+    private static List<String> resolveAcceptedButtonLabels(String buttonLabel) {
+        List<String> labels = new ArrayList<>();
+        if (buttonLabel != null && !buttonLabel.isBlank()) {
+            labels.add(buttonLabel);
+        }
+        if (ChatglotConfig.DEFAULT_TRANSLATE_BUTTON_LABEL.equals(buttonLabel)) {
+            labels.add(ChatglotConfig.LEGACY_TRANSLATE_BUTTON_LABEL);
+        }
+        return labels;
     }
 }

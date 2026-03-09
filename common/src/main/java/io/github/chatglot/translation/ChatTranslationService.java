@@ -10,6 +10,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +21,9 @@ public final class ChatTranslationService {
     private final TranslationProviderRegistry providerRegistry;
     private final Path configDir;
     private final Path gameDir;
-    private final ExecutorService executor;
+    private final Object executorLock = new Object();
+    private ExecutorService executor;
+    private int executorParallelism;
 
     public ChatTranslationService(
         ChatglotConfigManager configManager,
@@ -32,7 +35,7 @@ public final class ChatTranslationService {
         this.providerRegistry = providerRegistry;
         this.configDir = configDir;
         this.gameDir = gameDir;
-        this.executor = Executors.newSingleThreadExecutor(new ChatglotThreadFactory());
+        this.executorParallelism = 0;
     }
 
     public CompletableFuture<TranslationResult> translate(
@@ -41,10 +44,11 @@ public final class ChatTranslationService {
         String sourceLanguageHint,
         boolean automatic
     ) {
-        return CompletableFuture.supplyAsync(() -> {
-            ChatglotConfig config = configManager.get();
-            config.sanitize();
+        ChatglotConfig config = configManager.get();
+        config.sanitize();
+        ExecutorService currentExecutor = ensureExecutor(config.maxConcurrentTranslations);
 
+        return CompletableFuture.supplyAsync(() -> {
             if (!config.enabled) {
                 throw new CompletionException(new TranslationException("Chatglot is disabled in config."));
             }
@@ -81,7 +85,7 @@ public final class ChatTranslationService {
             } catch (Exception e) {
                 throw new CompletionException(new TranslationException("Unexpected translation failure", e));
             }
-        }, executor);
+        }, currentExecutor);
     }
 
     private static String resolveProviderId(String configuredProviderId) {
@@ -97,13 +101,38 @@ public final class ChatTranslationService {
     }
 
     public void shutdown() {
-        executor.shutdownNow();
+        synchronized (executorLock) {
+            if (executor != null) {
+                executor.shutdownNow();
+                executor = null;
+                executorParallelism = 0;
+            }
+        }
+    }
+
+    private ExecutorService ensureExecutor(int parallelism) {
+        int normalizedParallelism = Math.max(1, parallelism);
+        synchronized (executorLock) {
+            if (executor != null && executorParallelism == normalizedParallelism) {
+                return executor;
+            }
+
+            if (executor != null) {
+                executor.shutdown();
+            }
+
+            executor = Executors.newFixedThreadPool(normalizedParallelism, new ChatglotThreadFactory());
+            executorParallelism = normalizedParallelism;
+            return executor;
+        }
     }
 
     private static final class ChatglotThreadFactory implements ThreadFactory {
+        private final AtomicInteger threadCounter = new AtomicInteger(0);
+
         @Override
         public Thread newThread(Runnable runnable) {
-            Thread thread = new Thread(runnable, "chatglot-translator");
+            Thread thread = new Thread(runnable, "chatglot-translator-" + threadCounter.incrementAndGet());
             thread.setDaemon(true);
             thread.setUncaughtExceptionHandler((t, e) -> LOGGER.error("Uncaught async translation error", e));
             return thread;

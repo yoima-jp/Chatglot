@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 public final class LocalBackendInstaller {
     private static final String LLAMA_CPP_WINGET_ID = "ggml.llamacpp";
@@ -42,19 +43,27 @@ public final class LocalBackendInstaller {
     }
 
     public Path ensureRuntime(ChatglotConfig config) throws IOException {
+        return ensureRuntime(config, message -> {
+        });
+    }
+
+    public Path ensureRuntime(ChatglotConfig config, Consumer<String> progressListener) throws IOException {
         if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
             Path override = Path.of(config.localBackendCommand.trim());
             if (!Files.exists(override)) {
                 throw new IOException("Configured backend command was not found: " + override);
             }
+            progressListener.accept("Using backend command override: " + override);
             return override;
         }
 
         Path discovered = findLlamaServerExecutable();
         if (discovered != null) {
+            progressListener.accept("Found llama.cpp runtime: " + discovered);
             return discovered;
         }
 
+        progressListener.accept("Installing llama.cpp with winget...");
         List<String> command = List.of(
             "winget",
             "install",
@@ -79,14 +88,21 @@ public final class LocalBackendInstaller {
 
         discovered = findLlamaServerExecutable();
         if (discovered != null) {
+            progressListener.accept("Installed llama.cpp runtime: " + discovered);
             return discovered;
         }
         throw new IOException("Installed llama.cpp with winget, but llama-server.exe was not found. Check " + LocalBackendPaths.wingetPackagesDir());
     }
 
     public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot) throws IOException {
+        return ensureModelDownloaded(config, sharedRoot, message -> {
+        });
+    }
+
+    public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot, Consumer<String> progressListener) throws IOException {
         Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
         if (Files.exists(modelPath) && Files.size(modelPath) > 0) {
+            progressListener.accept("Model already present: " + modelPath);
             return modelPath;
         }
         if (config.localModelDownloadUrl == null || config.localModelDownloadUrl.isBlank()) {
@@ -96,6 +112,7 @@ public final class LocalBackendInstaller {
         Files.createDirectories(modelPath.getParent());
         Path tempPath = modelPath.resolveSibling(modelPath.getFileName() + ".part");
         Files.deleteIfExists(tempPath);
+        progressListener.accept("Downloading model from " + config.localModelDownloadUrl.trim());
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(config.localModelDownloadUrl.trim()))
             .timeout(Duration.ofMinutes(30))
@@ -118,8 +135,18 @@ public final class LocalBackendInstaller {
         try {
             Files.move(tempPath, modelPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException ignored) {
-            Files.move(tempPath, modelPath, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(tempPath, modelPath, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException moveError) {
+                if (Files.exists(modelPath) && Files.size(modelPath) > 0) {
+                    Files.deleteIfExists(tempPath);
+                    progressListener.accept("Model download finished: " + modelPath);
+                    return modelPath;
+                }
+                throw new IOException("Failed to finalize downloaded model file: " + moveError.getMessage(), moveError);
+            }
         }
+        progressListener.accept("Model download finished: " + modelPath);
         return modelPath;
     }
 

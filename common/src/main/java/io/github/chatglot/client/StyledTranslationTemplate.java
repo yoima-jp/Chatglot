@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -14,26 +16,47 @@ final class StyledTranslationTemplate {
     private static final String TOKEN_SUFFIX = "]]";
     private static final String TOKEN_CLOSE_PREFIX = "[[/CGT_";
     private static final Style DEFAULT_TEXT_STYLE = Style.EMPTY.withColor(Formatting.WHITE);
+    private static final Pattern LEADING_SPEAKER_PATTERN = Pattern.compile("^(<[^<>\\r\\n]+>\\s*)");
 
     private final String markedText;
     private final List<Segment> segments;
     private final Style fallbackStyle;
+    private final String preservedPrefix;
 
-    private StyledTranslationTemplate(String markedText, List<Segment> segments, Style fallbackStyle) {
+    private StyledTranslationTemplate(String markedText, List<Segment> segments, Style fallbackStyle, String preservedPrefix) {
         this.markedText = markedText;
         this.segments = segments;
         this.fallbackStyle = mergeWithDefaultStyle(fallbackStyle);
+        this.preservedPrefix = preservedPrefix == null ? "" : preservedPrefix;
     }
 
-    public static StyledTranslationTemplate create(Text originalMessage, String fallbackPlainText) {
+    public static StyledTranslationTemplate create(Text originalMessage, String fallbackPlainText, boolean preserveLeadingSpeakerPrefix) {
+        String plainText = fallbackPlainText;
+        if ((plainText == null || plainText.isEmpty()) && originalMessage != null) {
+            plainText = originalMessage.getString();
+        }
+        PrefixMatch prefixMatch = preserveLeadingSpeakerPrefix ? extractLeadingSpeakerPrefix(plainText) : new PrefixMatch("", 0);
+
         if (originalMessage == null) {
-            return new StyledTranslationTemplate(fallbackPlainText == null ? "" : fallbackPlainText, List.of(), Style.EMPTY);
+            String body = plainText == null ? "" : plainText.substring(prefixMatch.prefixLength());
+            return new StyledTranslationTemplate(body, List.of(), Style.EMPTY, prefixMatch.prefix());
         }
 
         List<Segment> segments = new ArrayList<>();
         StringBuilder marked = new StringBuilder();
+        int[] remainingPrefixLength = {prefixMatch.prefixLength()};
         originalMessage.visit((style, string) -> {
             if (string == null || string.isEmpty()) {
+                return Optional.empty();
+            }
+
+            String remainder = string;
+            if (remainingPrefixLength[0] > 0) {
+                int consumed = Math.min(remainingPrefixLength[0], remainder.length());
+                remainder = remainder.substring(consumed);
+                remainingPrefixLength[0] -= consumed;
+            }
+            if (remainder.isEmpty()) {
                 return Optional.empty();
             }
 
@@ -44,16 +67,16 @@ final class StyledTranslationTemplate {
                 mergeWithDefaultStyle(style)
             );
             segments.add(segment);
-            marked.append(segment.openToken()).append(string).append(segment.closeToken());
+            marked.append(segment.openToken()).append(remainder).append(segment.closeToken());
             return Optional.empty();
         }, Style.EMPTY);
 
         if (segments.isEmpty()) {
-            String plainText = fallbackPlainText == null ? originalMessage.getString() : fallbackPlainText;
-            return new StyledTranslationTemplate(plainText, List.of(), originalMessage.getStyle());
+            String body = plainText == null ? originalMessage.getString() : plainText.substring(prefixMatch.prefixLength());
+            return new StyledTranslationTemplate(body, List.of(), originalMessage.getStyle(), prefixMatch.prefix());
         }
 
-        return new StyledTranslationTemplate(marked.toString(), List.copyOf(segments), originalMessage.getStyle());
+        return new StyledTranslationTemplate(marked.toString(), List.copyOf(segments), originalMessage.getStyle(), prefixMatch.prefix());
     }
 
     public String markedText() {
@@ -63,17 +86,18 @@ final class StyledTranslationTemplate {
     public Text apply(String translatedText) {
         String value = translatedText == null ? "" : translatedText;
         if (segments.isEmpty()) {
-            return Text.literal(value).setStyle(fallbackStyle);
+            return Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
         }
 
         MutableText rebuilt = Text.empty();
+        appendLiteral(rebuilt, preservedPrefix, fallbackStyle);
         int cursor = 0;
         boolean appliedMarker = false;
         while (cursor < value.length()) {
             SegmentMatch nextSegment = findNextSegment(value, cursor);
             if (nextSegment == null) {
                 appendLiteral(rebuilt, value.substring(cursor), fallbackStyle);
-                return appliedMarker ? rebuilt : Text.literal(value).setStyle(fallbackStyle);
+                return appliedMarker ? rebuilt : Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
             }
 
             if (nextSegment.startIndex() > cursor) {
@@ -83,7 +107,7 @@ final class StyledTranslationTemplate {
             int contentStart = nextSegment.startIndex() + nextSegment.segment().openToken().length();
             int contentEnd = value.indexOf(nextSegment.segment().closeToken(), contentStart);
             if (contentEnd < 0) {
-                return Text.literal(value).setStyle(fallbackStyle);
+                return Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
             }
 
             appendLiteral(rebuilt, value.substring(contentStart, contentEnd), nextSegment.segment().style());
@@ -91,7 +115,20 @@ final class StyledTranslationTemplate {
             appliedMarker = true;
         }
 
-        return appliedMarker ? rebuilt : Text.literal(value).setStyle(fallbackStyle);
+        return appliedMarker ? rebuilt : Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
+    }
+
+    private static PrefixMatch extractLeadingSpeakerPrefix(String plainText) {
+        if (plainText == null || plainText.isEmpty()) {
+            return new PrefixMatch("", 0);
+        }
+
+        Matcher matcher = LEADING_SPEAKER_PATTERN.matcher(plainText);
+        if (!matcher.find()) {
+            return new PrefixMatch("", 0);
+        }
+        String prefix = matcher.group(1);
+        return new PrefixMatch(prefix, prefix.length());
     }
 
     private SegmentMatch findNextSegment(String value, int cursor) {
@@ -132,5 +169,8 @@ final class StyledTranslationTemplate {
     }
 
     private record SegmentMatch(Segment segment, int startIndex) {
+    }
+
+    private record PrefixMatch(String prefix, int prefixLength) {
     }
 }

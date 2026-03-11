@@ -91,7 +91,7 @@ macOS / Linux の場合:
 - モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
 - `translategemma_local` は **外部ローカルバックエンドプロセス** を localhost HTTP で利用します（Minecraft JVM 内では推論しません）。
 - 設定画面の `Setup and start TranslateGemma` は `winget` で `llama.cpp` を導入し、既定の GGUF モデルをダウンロードして `llama-server` を起動します。
-- 既定モデルは `matrixportalx/txgemma-2b-predict-GGUF` の `txgemma-2b-predict-Q4_K_M.gguf` を利用します。必要に応じて設定から URL やファイル名を上書きできます。
+- 既定モデルは `mradermacher/translategemma-4b-it-GGUF` の `translategemma-4b-it.Q4_K_M.gguf` を利用します。必要に応じて設定から URL やファイル名を上書きできます。
 - 共有ディレクトリは既定で `%LOCALAPPDATA%\ChatglotLocal\` です。`runtime/`, `models/`, `data/`, `logs/`, `state.json` を作成し、ログは `logs/backend.log` に保存します。
 - `localModelPath` と `localBackendCommand` を設定すると、既存のローカルモデルや独自ランタイムを優先して利用できます。
 

@@ -15,9 +15,9 @@ public class ChatglotConfig {
     public static final String AZURE_TRANSLATOR_DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
     public static final int LOCAL_BACKEND_DEFAULT_PORT = 17870;
     public static final String LOCAL_BACKEND_DEFAULT_MODEL_ALIAS = "translategemma";
-    public static final String LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME = "txgemma-2b-predict-q4_k_m.gguf";
+    public static final String LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME = "translategemma-4b-it.Q4_K_M.gguf";
     public static final String LOCAL_BACKEND_DEFAULT_MODEL_URL =
-        "https://huggingface.co/matrixportalx/txgemma-2b-predict-GGUF/resolve/main/txgemma-2b-predict-q4_k_m.gguf?download=true";
+        "https://huggingface.co/mradermacher/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it.Q4_K_M.gguf?download=true";
 
     public static final String CODEX_REASONING_EFFORT_LOW = "low";
     public static final String CODEX_REASONING_EFFORT_MEDIUM = "medium";
@@ -32,6 +32,7 @@ public class ChatglotConfig {
     public boolean autoTranslateEnabledWhenSupported = false;
     public boolean overwriteOriginalWithTranslation = false;
     public boolean showTranslationPrefix = true;
+    public boolean preserveLeadingSpeakerPrefix = true;
     public String targetLanguage = "EN";
     public boolean showSourceLanguageTag = true;
 
@@ -211,10 +212,16 @@ public class ChatglotConfig {
             localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
         }
         localModelFileName = localModelFileName.trim();
-        if ("txgemma-2b-predict-Q4_K_M.gguf".equals(localModelFileName)) {
+        if (
+            "txgemma-2b-predict-Q4_K_M.gguf".equals(localModelFileName)
+                || "txgemma-2b-predict-q4_k_m.gguf".equals(localModelFileName)
+        ) {
             localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
         }
-        if ("https://huggingface.co/matrixportalx/txgemma-2b-predict-GGUF/resolve/main/txgemma-2b-predict-Q4_K_M.gguf?download=true".equals(localModelDownloadUrl)) {
+        if (
+            "https://huggingface.co/matrixportalx/txgemma-2b-predict-GGUF/resolve/main/txgemma-2b-predict-Q4_K_M.gguf?download=true".equals(localModelDownloadUrl)
+                || "https://huggingface.co/matrixportalx/txgemma-2b-predict-GGUF/resolve/main/txgemma-2b-predict-q4_k_m.gguf?download=true".equals(localModelDownloadUrl)
+        ) {
             localModelDownloadUrl = LOCAL_BACKEND_DEFAULT_MODEL_URL;
         }
         if (localModelDownloadUrl == null || localModelDownloadUrl.isBlank()) {

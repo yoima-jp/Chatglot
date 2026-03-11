@@ -18,11 +18,10 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
+import java.util.Locale;
 
 public final class TranslateGemmaLocalTranslationProvider implements TranslationProvider {
-    private static final String SYSTEM_PROMPT =
-        "You are TranslateGemma helping with Minecraft chat. Return only the translated text and preserve names, commands, URLs, and formatting markers.";
-
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final LocalBackendManager backendManager;
 
@@ -44,22 +43,17 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
         }
 
         JsonObject payload = new JsonObject();
-        payload.addProperty("model", resolveModel(config));
+        payload.addProperty("prompt", buildTranslateGemmaPrompt(request));
+        payload.addProperty("n_predict", 256);
         payload.addProperty("temperature", 0.1);
+        payload.addProperty("cache_prompt", true);
+        JsonArray stop = new JsonArray();
+        for (String stopToken : List.of("<end_of_turn>", "<eos>", "</s>")) {
+            stop.add(stopToken);
+        }
+        payload.add("stop", stop);
 
-        JsonArray messages = new JsonArray();
-        JsonObject system = new JsonObject();
-        system.addProperty("role", "system");
-        system.addProperty("content", SYSTEM_PROMPT);
-        messages.add(system);
-
-        JsonObject user = new JsonObject();
-        user.addProperty("role", "user");
-        user.addProperty("content", TranslationPromptBuilder.buildStandardPrompt(request));
-        messages.add(user);
-        payload.add("messages", messages);
-
-        HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(status.backendUrl() + "/v1/chat/completions"))
+        HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(status.backendUrl() + "/completion"))
             .timeout(Duration.ofSeconds(config.requestTimeoutSeconds))
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(payload.toString(), StandardCharsets.UTF_8))
@@ -96,7 +90,65 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
         return ChatglotConfig.LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
     }
 
+    private static String buildTranslateGemmaPrompt(TranslationRequest request) {
+        String sourceCode = toTranslateGemmaLanguageCode(request.sourceLanguageHint(), "en");
+        String targetCode = toTranslateGemmaLanguageCode(request.targetLanguage(), "ja");
+        String sourceLanguage = toLanguageDisplayName(sourceCode);
+        String targetLanguage = toLanguageDisplayName(targetCode);
+        return "<bos><start_of_turn>user\n"
+            + "You are a professional "
+            + sourceLanguage
+            + " ("
+            + sourceCode
+            + ") to "
+            + targetLanguage
+            + " ("
+            + targetCode
+            + ") translator. "
+            + "Produce only the "
+            + targetLanguage
+            + " translation, without any additional explanations or commentary. "
+            + "Preserve player names, commands, URLs, placeholders, and formatting markers. "
+            + "If markers like [[CGT_0]]...[[/CGT_0]] appear, keep the markers exactly as-is and place translated text only between matching markers.\n\n"
+            + request.text().trim()
+            + "\n<end_of_turn>\n<start_of_turn>model\n";
+    }
+
+    private static String toTranslateGemmaLanguageCode(String language, String fallback) {
+        if (language == null || language.isBlank()) {
+            return fallback;
+        }
+
+        String normalized = language.trim().replace('_', '-');
+        normalized = switch (normalized.toUpperCase(Locale.ROOT)) {
+            case "ZH-HANS", "ZH-CN", "ZH-SG" -> "zh-Hans";
+            case "ZH-HANT", "ZH-TW", "ZH-HK", "ZH-MO" -> "zh-Hant";
+            case "EN-US" -> "en-US";
+            case "EN-GB" -> "en-GB";
+            case "PT-BR" -> "pt-BR";
+            case "PT-PT" -> "pt-PT";
+            default -> normalized.toLowerCase(Locale.ROOT);
+        };
+        return normalized;
+    }
+
+    private static String toLanguageDisplayName(String languageCode) {
+        return switch (languageCode) {
+            case "zh-Hans" -> "Simplified Chinese";
+            case "zh-Hant" -> "Traditional Chinese";
+            default -> {
+                Locale locale = Locale.forLanguageTag(languageCode);
+                String displayName = locale.getDisplayLanguage(Locale.ENGLISH);
+                yield displayName == null || displayName.isBlank() ? languageCode : displayName;
+            }
+        };
+    }
+
     private static String extractTranslatedText(JsonObject root) throws TranslationException {
+        if (root.has("content") && root.get("content").isJsonPrimitive()) {
+            return root.get("content").getAsString().trim();
+        }
+
         JsonArray choices = root.getAsJsonArray("choices");
         if (choices == null || choices.isEmpty()) {
             throw new TranslationException("Local backend returned no choices.");
@@ -107,12 +159,17 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
             throw new TranslationException("Local backend returned an invalid response.");
         }
         JsonObject firstObject = first.getAsJsonObject();
+        JsonElement content = null;
         JsonObject message = firstObject.getAsJsonObject("message");
-        if (message == null || !message.has("content")) {
-            throw new TranslationException("Local backend response missing message content.");
+        if (message != null && message.has("content")) {
+            content = message.get("content");
+        } else if (firstObject.has("text")) {
+            content = firstObject.get("text");
+        }
+        if (content == null) {
+            throw new TranslationException("Local backend response missing content.");
         }
 
-        JsonElement content = message.get("content");
         if (content.isJsonPrimitive()) {
             return content.getAsString().trim();
         }

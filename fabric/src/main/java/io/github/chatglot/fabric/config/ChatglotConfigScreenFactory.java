@@ -34,7 +34,6 @@ public final class ChatglotConfigScreenFactory {
     private static final String GEMINI_API_KEYS_URL = "https://aistudio.google.com/app/apikey";
     private static final String ANTHROPIC_API_KEYS_URL = "https://console.anthropic.com/settings/keys";
     private static final String AZURE_TRANSLATOR_API_KEYS_URL = "https://portal.azure.com";
-    private static final String OLLAMA_DOWNLOAD_URL = "https://ollama.com/download";
     private static final String GAS_APPS_SCRIPT_HOME_URL = "https://script.google.com/home/?hl=ja&pli=1";
     private static final String GAS_SCRIPT_TEMPLATE = """
 function doGet(e) {
@@ -302,6 +301,16 @@ function jsonResponse(obj) {
                 .startBooleanToggle(Text.translatable("chatglot.config.show_translation_prefix"), config.showTranslationPrefix)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.showTranslationPrefix = value)
+                .build()
+        );
+        general.addEntry(
+            entryBuilder
+                .startBooleanToggle(
+                    Text.translatable("chatglot.config.preserve_leading_speaker_prefix"),
+                    config.preserveLeadingSpeakerPrefix
+                )
+                .setDefaultValue(true)
+                .setSaveConsumer(value -> config.preserveLeadingSpeakerPrefix = value)
                 .build()
         );
         general.addEntry(
@@ -927,19 +936,31 @@ function jsonResponse(obj) {
 
 
     private static void setupLocalBackend(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        runLocalBackendAction(runtime, config, parent, () -> runtime.localBackendManager().setupAndStart(config), "setup");
+        runLocalBackendAction(
+            runtime,
+            config,
+            parent,
+            progress -> runtime.localBackendManager().setupAndStart(config, progress),
+            "setup"
+        );
     }
 
     private static void downloadLocalModel(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        runLocalBackendAction(runtime, config, parent, () -> runtime.localBackendManager().downloadModel(config), "download");
+        runLocalBackendAction(
+            runtime,
+            config,
+            parent,
+            progress -> runtime.localBackendManager().downloadModel(config, progress),
+            "download"
+        );
     }
 
     private static void checkLocalBackendStatus(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        runLocalBackendAction(runtime, config, parent, () -> runtime.localBackendManager().checkStatus(config), "status");
+        runLocalBackendAction(runtime, config, parent, progress -> runtime.localBackendManager().checkStatus(config), "status");
     }
 
     private interface LocalBackendAction {
-        LocalBackendStatus run() throws Exception;
+        LocalBackendStatus run(java.util.function.Consumer<String> progressListener) throws Exception;
     }
 
     private static void runLocalBackendAction(
@@ -950,11 +971,14 @@ function jsonResponse(obj) {
         String actionName
     ) {
         MinecraftClient client = MinecraftClient.getInstance();
+        updateLocalBackendProgress(client, parent, actionName + " started...", true);
         Thread worker = new Thread(() -> {
+            java.util.function.Consumer<String> progressListener = message ->
+                updateLocalBackendProgress(client, parent, message, true);
             try {
                 config.sanitize();
                 runtime.configManager().save();
-                LocalBackendStatus status = action.run();
+                LocalBackendStatus status = action.run(progressListener);
                 localBackendStatusMessage = status.message();
                 client.execute(() -> {
                     if (client.player != null) {
@@ -985,6 +1009,28 @@ function jsonResponse(obj) {
         }, "chatglot-local-backend-" + actionName);
         worker.setDaemon(true);
         worker.start();
+    }
+
+    private static volatile String lastLocalBackendChatMessage = "";
+
+    private static void updateLocalBackendProgress(MinecraftClient client, Screen parent, String message, boolean sendChatMessage) {
+        localBackendStatusMessage = message;
+        if (client == null) {
+            return;
+        }
+
+        client.execute(() -> {
+            if (sendChatMessage && client.player != null && !message.equals(lastLocalBackendChatMessage)) {
+                lastLocalBackendChatMessage = message;
+                client.player.sendMessage(
+                    Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
+                    false
+                );
+            }
+            if (parent != null && client.currentScreen != null) {
+                client.setScreen(create(parent));
+            }
+        });
     }
 
     private static List<MinecraftLanguageOption> collectLanguageOptions(MinecraftClient client) {

@@ -13,6 +13,7 @@ public class ChatglotConfig {
     public static final String GEMINI_DEFAULT_MODEL = "gemini-flash-latest";
     public static final String ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
     public static final String AZURE_TRANSLATOR_DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
+    public static final int LOCAL_BACKEND_DEFAULT_PORT = 47834;
 
     public static final String CODEX_REASONING_EFFORT_LOW = "low";
     public static final String CODEX_REASONING_EFFORT_MEDIUM = "medium";
@@ -55,6 +56,12 @@ public class ChatglotConfig {
     public String azureTranslatorRegion = "";
     public String azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
 
+    public String localBackendUrl = "http://127.0.0.1:" + LOCAL_BACKEND_DEFAULT_PORT;
+    public int localBackendPort = LOCAL_BACKEND_DEFAULT_PORT;
+    public String localBackendInstallDir = "";
+    public String localBackendModelPath = "";
+    public String localBackendModel = "translategemma-local";
+
     public int requestTimeoutSeconds = 45;
     public int maxConcurrentTranslations = 1;
 
@@ -93,7 +100,7 @@ public class ChatglotConfig {
         }
         provider = provider.trim().toLowerCase(Locale.ROOT);
         switch (provider) {
-            case "default", "deepl", "google", "gas", "codex", "openai", "gemini", "anthropic", "azure" -> {
+            case "default", "deepl", "google", "gas", "codex", "openai", "gemini", "anthropic", "azure", "translategemma_local" -> {
             }
             default -> provider = DEFAULT_PROVIDER;
         }
@@ -167,8 +174,27 @@ public class ChatglotConfig {
         if (azureTranslatorEndpoint == null || azureTranslatorEndpoint.isBlank()) {
             azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
         }
+        if (localBackendUrl == null || localBackendUrl.isBlank()) {
+            localBackendUrl = "http://127.0.0.1:" + LOCAL_BACKEND_DEFAULT_PORT;
+        }
+        if (localBackendInstallDir == null) {
+            localBackendInstallDir = "";
+        }
+        if (localBackendModelPath == null) {
+            localBackendModelPath = "";
+        }
+        if (localBackendModel == null || localBackendModel.isBlank()) {
+            localBackendModel = "translategemma-local";
+        }
+        if (localBackendPort < 1 || localBackendPort > 65535) {
+            localBackendPort = LOCAL_BACKEND_DEFAULT_PORT;
+        }
         azureTranslatorEndpoint = azureTranslatorEndpoint.trim();
         azureTranslatorRegion = azureTranslatorRegion.trim();
+        localBackendUrl = localBackendUrl.trim();
+        localBackendInstallDir = localBackendInstallDir.trim();
+        localBackendModelPath = localBackendModelPath.trim();
+        localBackendModel = localBackendModel.trim();
         codexTokenFile = codexTokenFile.trim();
         if (codexReasoningSummary == null) {
             codexReasoningSummary = "auto";

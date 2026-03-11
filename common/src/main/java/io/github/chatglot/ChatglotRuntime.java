@@ -1,6 +1,7 @@
 package io.github.chatglot;
 
 import io.github.chatglot.config.ChatglotConfigManager;
+import io.github.chatglot.localbackend.LocalBackendManager;
 import io.github.chatglot.translation.ChatTranslationService;
 import io.github.chatglot.translation.LanguageDetectorService;
 import io.github.chatglot.translation.TranslationProviderRegistry;
@@ -13,6 +14,7 @@ import io.github.chatglot.translation.provider.GasTranslationProvider;
 import io.github.chatglot.translation.provider.GeminiTranslationProvider;
 import io.github.chatglot.translation.provider.GoogleTranslationProvider;
 import io.github.chatglot.translation.provider.OpenAiTranslationProvider;
+import io.github.chatglot.translation.provider.TranslateGemmaLocalTranslationProvider;
 import io.github.chatglot.translation.provider.codex.CodexModelCatalogService;
 import io.github.chatglot.translation.provider.model.AnthropicModelCatalogService;
 import io.github.chatglot.translation.provider.model.GeminiModelCatalogService;
@@ -33,6 +35,7 @@ public final class ChatglotRuntime {
     private final OpenAiModelCatalogService openAiModelCatalogService;
     private final GeminiModelCatalogService geminiModelCatalogService;
     private final AnthropicModelCatalogService anthropicModelCatalogService;
+    private final LocalBackendManager localBackendManager;
 
     private ChatglotRuntime(Path configDir, Path gameDir) {
         this.configDir = configDir;
@@ -52,6 +55,8 @@ public final class ChatglotRuntime {
         this.providerRegistry.register(new GeminiTranslationProvider());
         this.providerRegistry.register(new AnthropicTranslationProvider());
         this.providerRegistry.register(new AzureTranslatorTranslationProvider());
+        this.providerRegistry.register(new TranslateGemmaLocalTranslationProvider());
+        this.localBackendManager = new LocalBackendManager();
         this.translationService = new ChatTranslationService(configManager, providerRegistry, configDir, gameDir);
         this.languageDetectorService = new LanguageDetectorService();
         this.requestStore = new TranslationRequestStore();
@@ -116,5 +121,9 @@ public final class ChatglotRuntime {
 
     public AnthropicModelCatalogService anthropicModelCatalogService() {
         return anthropicModelCatalogService;
+    }
+
+    public LocalBackendManager localBackendManager() {
+        return localBackendManager;
     }
 }

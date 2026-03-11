@@ -91,5 +91,16 @@
   "chatglot.config.azure_region": "Azureリージョン（任意）",
   "chatglot.config.azure_endpoint": "Azureエンドポイント",
   "key.chatglot.open_config": "Chatglot設定を開く",
-  "key.categories.chatglot.main": "Chatglot"
+  "key.categories.chatglot.main": "Chatglot",
+  "chatglot.config.category.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.local_backend_url": "ローカルバックエンド URL",
+  "chatglot.config.local_backend_port": "ローカルバックエンド ポート",
+  "chatglot.config.local_backend_model": "ローカルバックエンド モデル名",
+  "chatglot.config.local_backend_install_dir": "共有インストールディレクトリ（空で既定）",
+  "chatglot.config.local_backend_model_path": "ローカルモデルパス",
+  "chatglot.config.local_backend_manual_model_notice": "初期版ではモデルは手動設定です。バックエンド実行ファイルとモデルをローカルに配置してください。認証付き公式モデルの自動ダウンロードは行いません。",
+  "chatglot.config.local_backend_setup": "ローカルバックエンドをセットアップ",
+  "chatglot.config.local_backend_check_status": "状態を確認",
+  "chatglot.config.local_backend_restart": "バックエンドを再起動"
 }

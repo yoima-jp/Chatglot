@@ -91,5 +91,16 @@
   "chatglot.config.azure_region": "Azure region (optional)",
   "chatglot.config.azure_endpoint": "Azure endpoint",
   "key.chatglot.open_config": "Open Chatglot Settings",
-  "key.categories.chatglot.main": "Chatglot"
+  "key.categories.chatglot.main": "Chatglot",
+  "chatglot.config.category.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.local_backend_url": "Local backend URL",
+  "chatglot.config.local_backend_port": "Local backend port",
+  "chatglot.config.local_backend_model": "Local backend model alias",
+  "chatglot.config.local_backend_install_dir": "Shared install directory (blank=default)",
+  "chatglot.config.local_backend_model_path": "Local model path",
+  "chatglot.config.local_backend_manual_model_notice": "First version uses manual model setup. Place your backend runtime and model locally; no automatic gated model download is performed.",
+  "chatglot.config.local_backend_setup": "Setup local backend",
+  "chatglot.config.local_backend_check_status": "Check status",
+  "chatglot.config.local_backend_restart": "Restart backend"
 }

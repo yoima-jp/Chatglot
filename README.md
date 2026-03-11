@@ -10,7 +10,7 @@ Chatglot は Minecraft チャットを翻訳する Fabric クライアント MOD
 - 自動翻訳（Lingua による言語判定）
 - 翻訳結果を新規行表示、または原文チャットを置換
 - プロバイダ切り替え  
-  `default` / `gas` / `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure`
+  `default` / `gas` / `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure` / `translategemma_local`
 - Cloth Config + ModMenu でゲーム内設定
 - `F8` キーで設定画面を直接オープン
 
@@ -65,7 +65,7 @@ macOS / Linux の場合:
 - `showTranslationPrefix`: `【翻訳】➡` プレフィックスの表示/非表示
 - `targetLanguage`: 例 `JA`, `EN`, `EN-US`, `ZH-HANS`  
   初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
-- `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure`
+- `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure|translategemma_local`
 - `requestTimeoutSeconds`: 通信タイムアウト秒（5〜240）
 - `maxConcurrentTranslations`: 同時に進める翻訳数の上限（1〜16）
 
@@ -79,6 +79,9 @@ macOS / Linux の場合:
 - `geminiApiKey`, `geminiModel`
 - `anthropicApiKey`, `anthropicModel`
 - `azureTranslatorApiKey`, `azureTranslatorRegion`, `azureTranslatorEndpoint`
+- `translategemmaLocalBackendUrl`, `translategemmaLocalBackendPort`
+- `translategemmaLocalModelPath`, `translategemmaLocalModelAlias`
+- `translategemmaLocalInstallDir`, `translategemmaLocalBackendCommand`
 
 ## プロバイダ補足
 
@@ -87,6 +90,10 @@ macOS / Linux の場合:
 - `gas` は自分でデプロイした GAS Web アプリ URL（`.../exec`）を使用します。
 - `codex` は初回利用時にブラウザ OAuth を行い、`http://localhost:1455/auth/callback` で認証を受け取ります。
 - モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
+- `translategemma_local` は外部ローカルバックエンド（localhost HTTP）へ接続します。モデル推論は Minecraft JVM 内では実行しません。
+- 初期版は **Windows のみ** を対象とし、共有ディレクトリ `%LOCALAPPDATA%\ChatglotLocal\` に runtime/models/data/logs/state.json を配置します。
+- 初期版ではモデル取得は手動です（モデルファイルパスを設定）。トークン埋め込みや gated モデルの自動取得は行いません。
+- 複数の Minecraft インスタンスは同一の共有バックエンド state.json を参照し、ヘルスチェックで再利用を試みます。
 
 ## GAS 連携手順
 
@@ -108,6 +115,10 @@ macOS / Linux の場合:
 - `openai_models.json`
 - `gemini_models.json`
 - `anthropic_models.json`
+
+ローカルバックエンドの共有状態（Windows / `translategemma_local` 使用時）は既定で以下に保存されます。
+
+- `%LOCALAPPDATA%\ChatglotLocal\state.json`
 
 ## プロジェクト構成
 

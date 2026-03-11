@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.nio.file.Path;
+import io.github.chatglot.localbackend.LocalBackendPaths;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
@@ -103,6 +104,7 @@ function jsonResponse(obj) {
 """;
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
     private static final String CODEX_TOKEN_FILENAME = "codex_tokens.json";
+    private static volatile String localBackendStatus = "Not checked yet.";
 
     private enum ProviderOption {
         DEFAULT("default"),
@@ -113,7 +115,8 @@ function jsonResponse(obj) {
         AZURE("azure"),
         OPENAI("openai"),
         GEMINI("gemini"),
-        ANTHROPIC("anthropic");
+        ANTHROPIC("anthropic"),
+        TRANSLATEGEMMA_LOCAL("translategemma_local");
 
         private final String id;
 
@@ -140,6 +143,7 @@ function jsonResponse(obj) {
                 case "openai" -> OPENAI;
                 case "gemini" -> GEMINI;
                 case "anthropic" -> ANTHROPIC;
+                case "translategemma_local" -> TRANSLATEGEMMA_LOCAL;
                 default -> DEFAULT;
             };
         }
@@ -341,6 +345,7 @@ function jsonResponse(obj) {
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
 
         ConfigCategory deepL = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
         deepL.addEntry(
@@ -589,7 +594,131 @@ function jsonResponse(obj) {
                 .build()
         );
 
+        ConfigCategory translategemmaLocal = builder.getOrCreateCategory(
+            Text.translatable("chatglot.config.category.provider.translategemma_local")
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.translategemma_local.backend_url"), config.translategemmaLocalBackendUrl)
+                .setDefaultValue(ChatglotConfig.TRANSLATEGEMMA_LOCAL_DEFAULT_URL)
+                .setSaveConsumer(value -> config.translategemmaLocalBackendUrl = value)
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startIntField(Text.translatable("chatglot.config.translategemma_local.backend_port"), config.translategemmaLocalBackendPort)
+                .setDefaultValue(17495)
+                .setSaveConsumer(value -> config.translategemmaLocalBackendPort = value)
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.translategemma_local.install_dir"), config.translategemmaLocalInstallDir)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.translategemmaLocalInstallDir = value)
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.translategemma_local.model_path"), config.translategemmaLocalModelPath)
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.translategemmaLocalModelPath = value)
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startStrField(Text.translatable("chatglot.config.translategemma_local.model_alias"), config.translategemmaLocalModelAlias)
+                .setDefaultValue("translategemma-local")
+                .setSaveConsumer(value -> config.translategemmaLocalModelAlias = value)
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startStrField(
+                    Text.translatable("chatglot.config.translategemma_local.backend_command"),
+                    config.translategemmaLocalBackendCommand
+                )
+                .setDefaultValue("")
+                .setSaveConsumer(value -> config.translategemmaLocalBackendCommand = value)
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder
+                .startTextDescription(
+                    Text.translatable(
+                        "chatglot.config.translategemma_local.shared_dir_display",
+                        LocalBackendPaths.resolveSharedRoot(config).toString()
+                    )
+                )
+                .build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startTextDescription(Text.translatable("chatglot.config.translategemma_local.note.manual_model")).build()
+        );
+        translategemmaLocal.addEntry(
+            entryBuilder.startTextDescription(Text.translatable("chatglot.config.translategemma_local.status", localBackendStatus)).build()
+        );
+        translategemmaLocal.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.translategemma_local.setup_button"),
+                () -> setupLocalBackend(runtime, config, parent)
+            )
+        );
+        translategemmaLocal.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.translategemma_local.check_button"),
+                () -> checkLocalBackend(runtime, config)
+            )
+        );
+
         return builder.build();
+    }
+
+    private static void setupLocalBackend(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        localBackendStatus = "Setting up local backend...";
+        Thread thread = new Thread(() -> {
+            try {
+                runtime.configManager().save();
+                String status = runtime.localBackendManager().setupAndEnsureRunning(config);
+                localBackendStatus = status;
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(Text.translatable("chatglot.config.translategemma_local.setup_success", status), false);
+                    }
+                    client.setScreen(create(parent));
+                });
+            } catch (Exception e) {
+                localBackendStatus = "Setup failed: " + e.getMessage();
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(Text.translatable("chatglot.config.translategemma_local.setup_failed", e.getMessage()), false);
+                    }
+                    client.setScreen(create(parent));
+                });
+            }
+        }, "chatglot-local-backend-setup");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static void checkLocalBackend(ChatglotRuntime runtime, ChatglotConfig config) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        localBackendStatus = "Checking local backend...";
+        Thread thread = new Thread(() -> {
+            try {
+                String status = runtime.localBackendManager().checkStatus(config);
+                localBackendStatus = status;
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(Text.translatable("chatglot.config.translategemma_local.check_result", status), false);
+                    }
+                });
+            } catch (Exception e) {
+                localBackendStatus = "Status check failed: " + e.getMessage();
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(Text.translatable("chatglot.config.translategemma_local.check_failed", e.getMessage()), false);
+                    }
+                });
+            }
+        }, "chatglot-local-backend-check");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     private static List<String> collectModelOptions(List<String> cachedModels, String configuredModel, String defaultModel) {
@@ -964,4 +1093,3 @@ function jsonResponse(obj) {
         return normalizeLanguageCode(optionCode);
     }
 }
-

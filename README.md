@@ -10,7 +10,7 @@ Chatglot は Minecraft チャットを翻訳する Fabric クライアント MOD
 - 自動翻訳（Lingua による言語判定）
 - 翻訳結果を新規行表示、または原文チャットを置換
 - プロバイダ切り替え  
-  `default` / `gas` / `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure` / `translategemma_local`
+  `default` / `gas` / `deepl` / `google` / `codex` / `translategemma_local` / `openai` / `gemini` / `anthropic` / `azure`
 - Cloth Config + ModMenu でゲーム内設定
 - `F8` キーで設定画面を直接オープン
 
@@ -89,8 +89,9 @@ macOS / Linux の場合:
 - `gas` は自分でデプロイした GAS Web アプリ URL（`.../exec`）を使用します。
 - `codex` は初回利用時にブラウザ OAuth を行い、`http://localhost:1455/auth/callback` で認証を受け取ります。
 - モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
-- `translategemma_local` は **外部ローカルバックエンドプロセス** を localhost HTTP で利用します（Minecraft JVM 内では推論しません）。
-- 設定画面の `Setup and start TranslateGemma` は `winget` で `llama.cpp` を導入し、既定の GGUF モデルをダウンロードして `llama-server` を起動します。
+- `default` が混雑しているときは `gas` を自分で設定するか、PC スペックに余裕があれば `translategemma_local` を使うと高速・無料・実質無制限で使えます。
+- `translategemma_local` は **外部ローカルバックエンドプロセス** を localhost HTTP で利用するローカルモデル機能です（Minecraft JVM 内では推論しません）。
+- 設定画面では先に `Setup and start TranslateGemma`、その後に `Download / repair model` を実行してください。セットアップは `winget` で `llama.cpp` を導入し、既定の GGUF モデルをダウンロードして `llama-server` を起動します。
 - 既定モデルは `mradermacher/translategemma-4b-it-GGUF` の `translategemma-4b-it.Q4_K_M.gguf` を利用します。必要に応じて設定から URL やファイル名を上書きできます。
 - 共有ディレクトリは既定で `%LOCALAPPDATA%\ChatglotLocal\` です。`runtime/`, `models/`, `data/`, `logs/`, `state.json` を作成し、ログは `logs/backend.log` に保存します。
 - `localModelPath` と `localBackendCommand` を設定すると、既存のローカルモデルや独自ランタイムを優先して利用できます。

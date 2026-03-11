@@ -53,14 +53,23 @@ public final class LocalBackendManager {
             return new LocalBackendStatus(false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), "Unsupported OS. Local TranslateGemma is currently Windows-only.");
         }
 
+        LocalBackendState state = new LocalBackendStateStore(sharedRoot).load();
         Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
         boolean healthy = healthChecker.isHealthy(baseUrl, Math.min(10, config.requestTimeoutSeconds));
+        boolean running = isProcessAlive(state.pid);
         boolean modelPresent = Files.exists(modelPath);
         String runtimeMessage = resolveRuntimeMessage(config);
-        String message = healthy
-            ? "Backend is healthy. " + runtimeMessage + " Model: " + modelPath
-            : (!modelPresent ? "Backend is not reachable. " + runtimeMessage + " Model is missing: " + modelPath : "Backend is not reachable. " + runtimeMessage + " Model: " + modelPath);
-        return new LocalBackendStatus(true, healthy, healthy, baseUrl, sharedRoot, modelPath.toString(), message);
+        String message;
+        if (healthy) {
+            message = "Backend is healthy. " + runtimeMessage + " Model: " + modelPath;
+        } else if (running) {
+            message = "Backend is still starting. " + runtimeMessage + " Model: " + modelPath;
+        } else if (!modelPresent) {
+            message = "Backend is not reachable. " + runtimeMessage + " Model is missing: " + modelPath;
+        } else {
+            message = "Backend is not reachable. " + runtimeMessage + " Model: " + modelPath;
+        }
+        return new LocalBackendStatus(true, healthy, running, baseUrl, sharedRoot, modelPath.toString(), message);
     }
 
     public LocalBackendStatus setupAndStart(ChatglotConfig config) throws IOException {
@@ -96,6 +105,18 @@ public final class LocalBackendManager {
             state.lastKnownHealthyEpochMillis = Instant.now().toEpochMilli();
             store.save(state);
             return new LocalBackendStatus(true, true, true, baseUrl, sharedRoot, state.modelPath, "Backend already running and healthy. Runtime: " + runtimePath + " Model: " + modelPath);
+        }
+
+        if (isProcessAlive(state.pid)) {
+            return new LocalBackendStatus(
+                true,
+                false,
+                true,
+                baseUrl,
+                sharedRoot,
+                modelPath.toString(),
+                "Backend is already starting. Please wait a few seconds and try again."
+            );
         }
 
         progressListener.accept("Starting llama-server...");
@@ -205,6 +226,17 @@ public final class LocalBackendManager {
         if (!isWindows()) {
             return new LocalBackendStatus(false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), "Unsupported OS. Local TranslateGemma is currently Windows-only.");
         }
+        if (!installer.isRuntimeReady(config)) {
+            return new LocalBackendStatus(
+                true,
+                false,
+                false,
+                baseUrl,
+                sharedRoot,
+                LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(),
+                "Run setup first. Setup installs the local runtime required before downloading or repairing the model."
+            );
+        }
         try {
             progressListener.accept("Preparing local backend folders...");
             installer.ensureLayout(sharedRoot);
@@ -262,6 +294,7 @@ public final class LocalBackendManager {
         return List.of(
             runtimePath.toString(),
             "--no-jinja",
+            "--no-warmup",
             "--host",
             "127.0.0.1",
             "--port",

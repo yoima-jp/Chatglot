@@ -47,6 +47,18 @@ public final class LocalBackendInstaller {
         });
     }
 
+    public boolean isRuntimeReady(ChatglotConfig config) {
+        if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
+            return Files.exists(Path.of(config.localBackendCommand.trim()));
+        }
+
+        try {
+            return findLlamaServerExecutable() != null;
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     public Path ensureRuntime(ChatglotConfig config, Consumer<String> progressListener) throws IOException {
         if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
             Path override = Path.of(config.localBackendCommand.trim());

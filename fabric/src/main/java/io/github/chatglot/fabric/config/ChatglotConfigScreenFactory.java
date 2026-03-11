@@ -113,11 +113,11 @@ function jsonResponse(obj) {
         DEEPL("deepl"),
         GOOGLE("google"),
         CODEX("codex"),
+        TRANSLATEGEMMA_LOCAL("translategemma_local"),
         AZURE("azure"),
         OPENAI("openai"),
         GEMINI("gemini"),
-        ANTHROPIC("anthropic"),
-        TRANSLATEGEMMA_LOCAL("translategemma_local");
+        ANTHROPIC("anthropic");
 
         private final String id;
 
@@ -365,11 +365,11 @@ function jsonResponse(obj) {
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.google"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
+        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
         builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
 
         ConfigCategory deepL = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
         deepL.addEntry(
@@ -597,8 +597,27 @@ function jsonResponse(obj) {
         ConfigCategory localGemma = builder.getOrCreateCategory(
             Text.translatable("chatglot.config.category.provider.translategemma_local")
         );
+        localGemma.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_setup"),
+                () -> setupLocalBackend(runtime, config, parent)
+            )
+        );
+        localGemma.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_download_model"),
+                () -> downloadLocalModel(runtime, config, parent)
+            )
+        );
+        localGemma.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_status"),
+                () -> checkLocalBackendStatus(runtime, config, parent)
+            )
+        );
         localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_windows_only")).build());
         localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_setup_notice")).build());
+        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_save_notice")).build());
         localGemma.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_base_url"), config.localBackendBaseUrl)
                 .setDefaultValue("")
@@ -661,24 +680,6 @@ function jsonResponse(obj) {
                     LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory)).toString()
                 )
             ).build()
-        );
-        localGemma.addEntry(
-            new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_setup"),
-                () -> setupLocalBackend(runtime, config, parent)
-            )
-        );
-        localGemma.addEntry(
-            new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_status"),
-                () -> checkLocalBackendStatus(runtime, config, parent)
-            )
-        );
-        localGemma.addEntry(
-            new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_download_model"),
-                () -> downloadLocalModel(runtime, config, parent)
-            )
         );
         if (!localBackendStatusMessage.isBlank()) {
             localGemma.addEntry(

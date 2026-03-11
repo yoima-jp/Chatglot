@@ -37,7 +37,7 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
     @Override
     public TranslationResult translate(TranslationRequest request, ChatglotConfig config, Path configDir, Path gameDir)
         throws TranslationException {
-        LocalBackendStatus status = backendManager.ensureBackendAvailable(config);
+        LocalBackendStatus status = backendManager.checkStatus(config);
         if (!status.healthy()) {
             throw new TranslationException("Local backend unavailable: " + status.message());
         }

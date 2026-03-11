@@ -4,7 +4,7 @@ import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.TranslationException;
-import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import net.minecraft.network.message.MessageSignatureData;
 import net.minecraft.text.Text;
@@ -35,18 +35,15 @@ public final class ChatTranslationActions {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         ChatglotConfig config = runtime.configManager().get();
         String resolvedTargetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
-        String resolvedSourceLanguageHint = sourceLanguageHint;
-        if (resolvedSourceLanguageHint == null || resolvedSourceLanguageHint.isBlank()) {
-            Optional<String> detected = runtime.languageDetectorService().detectLanguage(originalText);
-            resolvedSourceLanguageHint = detected.orElse("");
-        }
         StyledTranslationTemplate template = StyledTranslationTemplate.create(
             originalMessage,
             originalText,
             config.preserveLeadingSpeakerPrefix
         );
-        runtime.translationService()
-            .translate(template.markedText(), resolvedTargetLanguage, resolvedSourceLanguageHint, automatic)
+        resolveSourceLanguageHint(runtime, config, originalText, sourceLanguageHint)
+            .thenCompose(resolvedSourceLanguageHint -> runtime.translationService()
+                .translate(template.markedText(), resolvedTargetLanguage, resolvedSourceLanguageHint, automatic)
+            )
             .thenAccept(result -> ChatOutput.postTranslation(result, originalText, originalSignature, template))
             .exceptionally(error -> {
                 Throwable unwrapped = unwrap(error);
@@ -55,6 +52,23 @@ public final class ChatTranslationActions {
                 ChatOutput.postError(message);
                 return null;
             });
+    }
+
+    private static CompletableFuture<String> resolveSourceLanguageHint(
+        ChatglotRuntime runtime,
+        ChatglotConfig config,
+        String originalText,
+        String sourceLanguageHint
+    ) {
+        if (sourceLanguageHint != null && !sourceLanguageHint.isBlank()) {
+            return CompletableFuture.completedFuture(sourceLanguageHint);
+        }
+        if (!"translategemma_local".equalsIgnoreCase(config.provider)) {
+            return CompletableFuture.completedFuture(sourceLanguageHint);
+        }
+        return runtime.languageDetectorService()
+            .detectLanguageAsync(originalText)
+            .thenApply(detected -> detected.orElse(""));
     }
 
     private static Throwable unwrap(Throwable throwable) {

@@ -253,6 +253,7 @@ function jsonResponse(obj) {
         builder.setSavingRunnable(() -> {
             config.sanitize();
             runtime.configManager().save();
+            runtime.localBackendManager().applyConfiguredBackendPolicyAsync(config);
         });
 
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();

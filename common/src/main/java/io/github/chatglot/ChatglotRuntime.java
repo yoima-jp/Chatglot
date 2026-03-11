@@ -79,6 +79,11 @@ public final class ChatglotRuntime {
         return instance;
     }
 
+    public void shutdown() {
+        translationService.shutdown();
+        localBackendManager.stopManagedBackend(configManager.get());
+    }
+
     public Path configDir() {
         return configDir;
     }

@@ -4,6 +4,8 @@ public final class LocalBackendState {
     public String backendVersion = "llama.cpp";
     public int port = 17870;
     public Long pid;
+    public Long ownerPid;
+    public Long watcherPid;
     public String runtimePath = "";
     public String executablePath = "";
     public String modelPath = "";

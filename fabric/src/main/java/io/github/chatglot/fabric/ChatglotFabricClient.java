@@ -6,6 +6,7 @@ import io.github.chatglot.fabric.command.ChatglotClientCommands;
 import io.github.chatglot.fabric.config.ChatglotConfigScreenFactory;
 import io.github.chatglot.translation.LanguageUtil;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.loader.api.FabricLoader;
@@ -25,9 +26,11 @@ public final class ChatglotFabricClient implements ClientModInitializer {
         FabricLoader loader = FabricLoader.getInstance();
         ChatglotRuntime.initialize(loader.getConfigDir(), loader.getGameDir());
         applyMinecraftLanguageDefaultIfNeeded();
+        applyLocalBackendPolicyOnStartup();
 
         ChatglotClientCommands.register();
         registerKeyBinding();
+        registerLifecycleHooks();
 
         ChatglotFabric.LOGGER.info("Chatglot initialized.");
     }
@@ -58,5 +61,26 @@ public final class ChatglotFabricClient implements ClientModInitializer {
         ChatglotConfig config = runtime.configManager().get();
         config.targetLanguage = LanguageUtil.MINECRAFT_DEFAULT_TARGET;
         runtime.configManager().save();
+    }
+
+    private static void applyLocalBackendPolicyOnStartup() {
+        ChatglotRuntime runtime = ChatglotRuntime.get();
+        runtime.localBackendManager().applyConfiguredBackendPolicyAsync(runtime.configManager().get());
+    }
+
+    private static void registerLifecycleHooks() {
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
+            if (!ChatglotRuntime.isInitialized()) {
+                return;
+            }
+            ChatglotRuntime.get().shutdown();
+        });
+
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (!ChatglotRuntime.isInitialized()) {
+                return;
+            }
+            ChatglotRuntime.get().shutdown();
+        }, "chatglot-shutdown"));
     }
 }

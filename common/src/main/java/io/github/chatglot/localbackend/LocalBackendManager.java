@@ -9,8 +9,12 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class LocalBackendManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger("Chatglot/LocalBackend");
+
     private final LocalBackendInstaller installer = new LocalBackendInstaller();
     private final LocalBackendHealthChecker healthChecker = new LocalBackendHealthChecker();
 
@@ -26,6 +30,20 @@ public final class LocalBackendManager {
 
     public CompletableFuture<LocalBackendStatus> checkStatusAsync(ChatglotConfig config) {
         return CompletableFuture.supplyAsync(() -> checkStatus(config));
+    }
+
+    public CompletableFuture<Void> applyConfiguredBackendPolicyAsync(ChatglotConfig config) {
+        return CompletableFuture.runAsync(() -> applyConfiguredBackendPolicy(config));
+    }
+
+    public void applyConfiguredBackendPolicy(ChatglotConfig config) {
+        config.sanitize();
+        cleanupOrphanedBackend(config);
+        if (isLocalProviderSelected(config)) {
+            ensureBackendAvailable(config);
+            return;
+        }
+        stopManagedBackend(config);
     }
 
     public LocalBackendStatus checkStatus(ChatglotConfig config) {
@@ -87,6 +105,8 @@ public final class LocalBackendManager {
         processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(LocalBackendPaths.logFile(sharedRoot).toFile()));
         Process process = processBuilder.start();
         state.pid = process.pid();
+        state.ownerPid = ProcessHandle.current().pid();
+        state.watcherPid = startWatcher(state.ownerPid, state.pid);
         store.save(state);
 
         long startedAt = System.currentTimeMillis();
@@ -112,6 +132,7 @@ public final class LocalBackendManager {
     }
 
     public LocalBackendStatus ensureBackendAvailable(ChatglotConfig config) {
+        cleanupOrphanedBackend(config);
         LocalBackendStatus status = checkStatus(config);
         if (status.healthy()) {
             return status;
@@ -120,6 +141,56 @@ public final class LocalBackendManager {
             return setupAndStart(config);
         } catch (Exception e) {
             return new LocalBackendStatus(status.supported(), false, false, status.backendUrl(), status.sharedRoot(), status.modelPath(), "Failed to start backend: " + e.getMessage());
+        }
+    }
+
+    public void stopManagedBackend(ChatglotConfig config) {
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+        LocalBackendStateStore store = new LocalBackendStateStore(sharedRoot);
+        LocalBackendState state = store.load();
+        long currentPid = ProcessHandle.current().pid();
+
+        if (state.ownerPid != null && state.ownerPid == currentPid && state.pid != null) {
+            stopProcess(state.pid);
+        }
+        if (state.watcherPid != null) {
+            stopProcess(state.watcherPid);
+        }
+
+        state.pid = null;
+        state.ownerPid = null;
+        state.watcherPid = null;
+        try {
+            store.save(state);
+        } catch (IOException e) {
+            LOGGER.warn("Failed to save local backend state during shutdown: {}", e.getMessage());
+        }
+    }
+
+    public void cleanupOrphanedBackend(ChatglotConfig config) {
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+        LocalBackendStateStore store = new LocalBackendStateStore(sharedRoot);
+        LocalBackendState state = store.load();
+        if (state.pid == null || state.ownerPid == null) {
+            return;
+        }
+
+        if (isProcessAlive(state.ownerPid)) {
+            return;
+        }
+
+        LOGGER.info("Cleaning up orphaned local backend process. ownerPid={} backendPid={}", state.ownerPid, state.pid);
+        stopProcess(state.pid);
+        if (state.watcherPid != null) {
+            stopProcess(state.watcherPid);
+        }
+        state.pid = null;
+        state.ownerPid = null;
+        state.watcherPid = null;
+        try {
+            store.save(state);
+        } catch (IOException e) {
+            LOGGER.warn("Failed to save local backend state after orphan cleanup: {}", e.getMessage());
         }
     }
 
@@ -153,6 +224,10 @@ public final class LocalBackendManager {
 
     private static boolean isWindows() {
         return System.getProperty("os.name", "").toLowerCase().contains("win");
+    }
+
+    private static boolean isLocalProviderSelected(ChatglotConfig config) {
+        return "translategemma_local".equalsIgnoreCase(config.provider);
     }
 
     private String resolveRuntimeMessage(ChatglotConfig config) {
@@ -205,5 +280,59 @@ public final class LocalBackendManager {
             return ChatglotConfig.LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
         }
         return config.localModelAlias.trim();
+    }
+
+    private static Long startWatcher(long ownerPid, long childPid) {
+        if (!isWindows()) {
+            return null;
+        }
+
+        String script =
+            "$owner=" + ownerPid + ";"
+                + "$child=" + childPid + ";"
+                + "while (Get-Process -Id $owner -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 2 }; "
+                + "Stop-Process -Id $child -Force -ErrorAction SilentlyContinue";
+        try {
+            Process watcher = new ProcessBuilder(
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                script
+            ).start();
+            return watcher.pid();
+        } catch (IOException e) {
+            LOGGER.warn("Failed to start local backend watcher: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private static boolean isProcessAlive(Long pid) {
+        if (pid == null) {
+            return false;
+        }
+        return ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
+    }
+
+    private static void stopProcess(Long pid) {
+        if (pid == null) {
+            return;
+        }
+        ProcessHandle.of(pid).ifPresent(process -> {
+            process.descendants().forEach(ProcessHandle::destroy);
+            process.destroy();
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (process.isAlive()) {
+                process.descendants().forEach(ProcessHandle::destroyForcibly);
+                process.destroyForcibly();
+            }
+        });
     }
 }

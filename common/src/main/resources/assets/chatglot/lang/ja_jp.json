@@ -91,5 +91,20 @@
   "chatglot.config.azure_region": "Azureリージョン（任意）",
   "chatglot.config.azure_endpoint": "Azureエンドポイント",
   "key.chatglot.open_config": "Chatglot設定を開く",
-  "key.categories.chatglot.main": "Chatglot"
+  "key.categories.chatglot.main": "Chatglot",
+  "chatglot.config.category.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.translategemma_local_backend_url": "バックエンドURL (localhost)",
+  "chatglot.config.translategemma_local_port": "バックエンドポート",
+  "chatglot.config.translategemma_local_model_path": "ローカルモデルファイルパス（手動）",
+  "chatglot.config.translategemma_local_model_name": "モデル別名/名前",
+  "chatglot.config.translategemma_local_launcher_command": "バックエンド起動コマンド",
+  "chatglot.config.translategemma_local_install_dir": "共有インストールディレクトリ（空で既定）",
+  "chatglot.config.translategemma_local_backend_url_display": "バックエンド接続先: %s",
+  "chatglot.config.translategemma_local_shared_dir_display": "共有ディレクトリ: %s",
+  "chatglot.config.translategemma_local_model_path_display": "設定済みモデルパス: %s",
+  "chatglot.config.translategemma_local_setup_button": "ローカルバックエンドをセットアップ",
+  "chatglot.config.translategemma_local_status_button": "状態を確認",
+  "chatglot.config.translategemma_local_status_display": "ローカルバックエンド状態: %s",
+  "chatglot.config.translategemma_local_manual_setup_notice": "初期バージョンはWindows専用です。ローカルモデル/ランタイムは手動で準備してください（制限付きモデルの自動ダウンロードは行いません）。"
 }

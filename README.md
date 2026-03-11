@@ -80,7 +80,7 @@ macOS / Linux の場合:
 - `anthropicApiKey`, `anthropicModel`
 - `azureTranslatorApiKey`, `azureTranslatorRegion`, `azureTranslatorEndpoint`
 - `localBackendBaseUrl`, `localBackendPort`, `localBackendSharedDirectory`, `localBackendCommand`
-- `localModelPath`, `localModelAlias`
+- `localModelPath`, `localModelAlias`, `localModelFileName`, `localModelDownloadUrl`
 
 ## プロバイダ補足
 
@@ -90,10 +90,10 @@ macOS / Linux の場合:
 - `codex` は初回利用時にブラウザ OAuth を行い、`http://localhost:1455/auth/callback` で認証を受け取ります。
 - モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
 - `translategemma_local` は **外部ローカルバックエンドプロセス** を localhost HTTP で利用します（Minecraft JVM 内では推論しません）。
-- 初期版は Windows のみ対応です。既定共有ディレクトリは `%LOCALAPPDATA%\ChatglotLocal\` です。
-- 共有ディレクトリには `runtime/`, `models/`, `data/`, `logs/`, `state.json` を作成し、複数インスタンスで共有します。
-- モデル取得は初期版では手動です（UI で既存モデルファイルパスを指定）。
-- トークン埋め込み・自動ダウンロード（gated model 含む）は行いません。
+- 設定画面の `Setup and start TranslateGemma` は `winget` で `llama.cpp` を導入し、既定の GGUF モデルをダウンロードして `llama-server` を起動します。
+- 既定モデルは `matrixportalx/txgemma-2b-predict-GGUF` の `txgemma-2b-predict-Q4_K_M.gguf` を利用します。必要に応じて設定から URL やファイル名を上書きできます。
+- 共有ディレクトリは既定で `%LOCALAPPDATA%\ChatglotLocal\` です。`runtime/`, `models/`, `data/`, `logs/`, `state.json` を作成し、ログは `logs/backend.log` に保存します。
+- `localModelPath` と `localBackendCommand` を設定すると、既存のローカルモデルや独自ランタイムを優先して利用できます。
 
 ## GAS 連携手順
 

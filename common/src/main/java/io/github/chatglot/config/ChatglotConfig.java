@@ -14,6 +14,10 @@ public class ChatglotConfig {
     public static final String ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
     public static final String AZURE_TRANSLATOR_DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
     public static final int LOCAL_BACKEND_DEFAULT_PORT = 17870;
+    public static final String LOCAL_BACKEND_DEFAULT_MODEL_ALIAS = "translategemma";
+    public static final String LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME = "txgemma-2b-predict-q4_k_m.gguf";
+    public static final String LOCAL_BACKEND_DEFAULT_MODEL_URL =
+        "https://huggingface.co/matrixportalx/txgemma-2b-predict-GGUF/resolve/main/txgemma-2b-predict-q4_k_m.gguf?download=true";
 
     public static final String CODEX_REASONING_EFFORT_LOW = "low";
     public static final String CODEX_REASONING_EFFORT_MEDIUM = "medium";
@@ -61,7 +65,9 @@ public class ChatglotConfig {
     public String localBackendSharedDirectory = "";
     public String localBackendCommand = "";
     public String localModelPath = "";
-    public String localModelAlias = "translategemma";
+    public String localModelAlias = LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
+    public String localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
+    public String localModelDownloadUrl = LOCAL_BACKEND_DEFAULT_MODEL_URL;
 
     public int requestTimeoutSeconds = 45;
     public int maxConcurrentTranslations = 1;
@@ -198,9 +204,23 @@ public class ChatglotConfig {
         }
         localModelPath = localModelPath.trim();
         if (localModelAlias == null || localModelAlias.isBlank()) {
-            localModelAlias = "translategemma";
+            localModelAlias = LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
         }
         localModelAlias = localModelAlias.trim();
+        if (localModelFileName == null || localModelFileName.isBlank()) {
+            localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
+        }
+        localModelFileName = localModelFileName.trim();
+        if ("txgemma-2b-predict-Q4_K_M.gguf".equals(localModelFileName)) {
+            localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
+        }
+        if ("https://huggingface.co/matrixportalx/txgemma-2b-predict-GGUF/resolve/main/txgemma-2b-predict-Q4_K_M.gguf?download=true".equals(localModelDownloadUrl)) {
+            localModelDownloadUrl = LOCAL_BACKEND_DEFAULT_MODEL_URL;
+        }
+        if (localModelDownloadUrl == null || localModelDownloadUrl.isBlank()) {
+            localModelDownloadUrl = LOCAL_BACKEND_DEFAULT_MODEL_URL;
+        }
+        localModelDownloadUrl = localModelDownloadUrl.trim();
 
         codexTokenFile = codexTokenFile.trim();
         if (codexReasoningSummary == null) {
@@ -209,6 +229,6 @@ public class ChatglotConfig {
         codexReasoningSummary = codexReasoningSummary.trim();
 
         autoTranslateEnabled = autoTranslateEnabledWhenSupported && !DEFAULT_PROVIDER.equals(provider);
-
     }
 }
+

@@ -20,6 +20,9 @@ import java.nio.file.Path;
 import java.time.Duration;
 
 public final class TranslateGemmaLocalTranslationProvider implements TranslationProvider {
+    private static final String SYSTEM_PROMPT =
+        "You are TranslateGemma helping with Minecraft chat. Return only the translated text and preserve names, commands, URLs, and formatting markers.";
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final LocalBackendManager backendManager;
 
@@ -42,11 +45,12 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
 
         JsonObject payload = new JsonObject();
         payload.addProperty("model", resolveModel(config));
+        payload.addProperty("temperature", 0.1);
 
         JsonArray messages = new JsonArray();
         JsonObject system = new JsonObject();
         system.addProperty("role", "system");
-        system.addProperty("content", "You are a translation engine for Minecraft chat. Return only translated text.");
+        system.addProperty("content", SYSTEM_PROMPT);
         messages.add(system);
 
         JsonObject user = new JsonObject();
@@ -89,7 +93,7 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
         if (config.localModelAlias != null && !config.localModelAlias.isBlank()) {
             return config.localModelAlias.trim();
         }
-        return "translategemma";
+        return ChatglotConfig.LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
     }
 
     private static String extractTranslatedText(JsonObject root) throws TranslationException {
@@ -108,6 +112,28 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
             throw new TranslationException("Local backend response missing message content.");
         }
 
-        return message.get("content").getAsString().trim();
+        JsonElement content = message.get("content");
+        if (content.isJsonPrimitive()) {
+            return content.getAsString().trim();
+        }
+        if (content.isJsonArray()) {
+            StringBuilder builder = new StringBuilder();
+            for (JsonElement element : content.getAsJsonArray()) {
+                if (!element.isJsonObject()) {
+                    continue;
+                }
+                JsonObject part = element.getAsJsonObject();
+                if (!part.has("text") || !part.get("text").isJsonPrimitive()) {
+                    continue;
+                }
+                if (!builder.isEmpty()) {
+                    builder.append('\n');
+                }
+                builder.append(part.get("text").getAsString());
+            }
+            return builder.toString().trim();
+        }
+
+        return "";
     }
 }

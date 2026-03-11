@@ -34,6 +34,7 @@ public final class ChatglotConfigScreenFactory {
     private static final String GEMINI_API_KEYS_URL = "https://aistudio.google.com/app/apikey";
     private static final String ANTHROPIC_API_KEYS_URL = "https://console.anthropic.com/settings/keys";
     private static final String AZURE_TRANSLATOR_API_KEYS_URL = "https://portal.azure.com";
+    private static final String OLLAMA_DOWNLOAD_URL = "https://ollama.com/download";
     private static final String GAS_APPS_SCRIPT_HOME_URL = "https://script.google.com/home/?hl=ja&pli=1";
     private static final String GAS_SCRIPT_TEMPLATE = """
 function doGet(e) {
@@ -102,9 +103,10 @@ function jsonResponse(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
-""";
+    """;
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
     private static final String CODEX_TOKEN_FILENAME = "codex_tokens.json";
+    private static volatile String localBackendStatusMessage = "";
 
     private enum ProviderOption {
         DEFAULT("default"),
@@ -231,6 +233,18 @@ function jsonResponse(obj) {
             config.anthropicModel,
             selectableAnthropicModels,
             defaultAnthropicModel
+        );
+
+        List<String> selectableTranslateGemmaModels = collectModelOptions(
+            List.of("translategemma:4b", "translategemma:12b", "translategemma:27b"),
+            config.localModelAlias,
+            ChatglotConfig.LOCAL_BACKEND_DEFAULT_MODEL_ALIAS
+        );
+        String defaultTranslateGemmaModel = ChatglotConfig.LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
+        String selectedTranslateGemmaModel = resolveModelFromInput(
+            config.localModelAlias,
+            selectableTranslateGemmaModels,
+            defaultTranslateGemmaModel
         );
 
         ConfigBuilder builder = ConfigBuilder.create()
@@ -570,9 +584,11 @@ function jsonResponse(obj) {
 
 
 
-        ConfigCategory localGemma = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
+        ConfigCategory localGemma = builder.getOrCreateCategory(
+            Text.translatable("chatglot.config.category.provider.translategemma_local")
+        );
         localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_windows_only")).build());
-        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_manual_model_notice")).build());
+        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_setup_notice")).build());
         localGemma.addEntry(
             entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_base_url"), config.localBackendBaseUrl)
                 .setDefaultValue("")
@@ -604,19 +620,38 @@ function jsonResponse(obj) {
                 .build()
         );
         localGemma.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_model_alias"), config.localModelAlias)
-                .setDefaultValue("translategemma")
-                .setSaveConsumer(value -> config.localModelAlias = value)
+            entryBuilder
+                .startDropdownMenu(
+                    Text.translatable("chatglot.config.local_backend_model_alias"),
+                    selectedTranslateGemmaModel,
+                    value -> resolveModelFromInput(value, selectableTranslateGemmaModels, selectedTranslateGemmaModel),
+                    Text::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                )
+                .setSelections(selectableTranslateGemmaModels)
+                .setDefaultValue(defaultTranslateGemmaModel)
+                .setSuggestionMode(true)
+                .setSaveConsumer(value -> config.localModelAlias = normalizeModelValue(value))
                 .build()
         );
-
         String resolvedSharedDir = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory).toString();
         String resolvedBackendUrl = (config.localBackendBaseUrl == null || config.localBackendBaseUrl.isBlank())
             ? "http://127.0.0.1:" + config.localBackendPort
             : config.localBackendBaseUrl.trim();
-        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_resolved_url", resolvedBackendUrl)).build());
-        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_resolved_shared_dir", resolvedSharedDir)).build());
-
+        localGemma.addEntry(
+            entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_resolved_url", resolvedBackendUrl)).build()
+        );
+        localGemma.addEntry(
+            entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_resolved_shared_dir", resolvedSharedDir)).build()
+        );
+        localGemma.addEntry(
+            entryBuilder.startTextDescription(
+                Text.translatable(
+                    "chatglot.config.local_backend_log_file",
+                    LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory)).toString()
+                )
+            ).build()
+        );
         localGemma.addEntry(
             new CodexAuthButtonEntry(
                 Text.translatable("chatglot.config.local_backend_setup"),
@@ -626,9 +661,22 @@ function jsonResponse(obj) {
         localGemma.addEntry(
             new CodexAuthButtonEntry(
                 Text.translatable("chatglot.config.local_backend_status"),
-                () -> checkLocalBackendStatus(runtime, config)
+                () -> checkLocalBackendStatus(runtime, config, parent)
             )
         );
+        localGemma.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_download_model"),
+                () -> downloadLocalModel(runtime, config, parent)
+            )
+        );
+        if (!localBackendStatusMessage.isBlank()) {
+            localGemma.addEntry(
+                entryBuilder.startTextDescription(
+                    Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage)
+                ).build()
+            );
+        }
 
         ConfigCategory azure = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
         azure.addEntry(
@@ -879,42 +927,62 @@ function jsonResponse(obj) {
 
 
     private static void setupLocalBackend(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        runLocalBackendAction(runtime, config, parent, () -> runtime.localBackendManager().setupAndStart(config), "setup");
+    }
+
+    private static void downloadLocalModel(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        runLocalBackendAction(runtime, config, parent, () -> runtime.localBackendManager().downloadModel(config), "download");
+    }
+
+    private static void checkLocalBackendStatus(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        runLocalBackendAction(runtime, config, parent, () -> runtime.localBackendManager().checkStatus(config), "status");
+    }
+
+    private interface LocalBackendAction {
+        LocalBackendStatus run() throws Exception;
+    }
+
+    private static void runLocalBackendAction(
+        ChatglotRuntime runtime,
+        ChatglotConfig config,
+        Screen parent,
+        LocalBackendAction action,
+        String actionName
+    ) {
         MinecraftClient client = MinecraftClient.getInstance();
         Thread worker = new Thread(() -> {
             try {
-                LocalBackendStatus status = runtime.localBackendManager().setupAndStart(config);
-                if (client.player != null) {
-                    client.execute(() -> client.player.sendMessage(
-                        Text.translatable("chatglot.config.local_backend_status_message", status.message()),
-                        false
-                    ));
-                }
+                config.sanitize();
+                runtime.configManager().save();
+                LocalBackendStatus status = action.run();
+                localBackendStatusMessage = status.message();
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(
+                            Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
+                            false
+                        );
+                    }
+                    if (parent != null) {
+                        client.setScreen(create(parent));
+                    }
+                });
             } catch (Exception e) {
-                LOGGER.warn("Failed to setup local backend: {}", e.getMessage());
-                if (client.player != null) {
-                    client.execute(() -> client.player.sendMessage(
-                        Text.translatable("chatglot.config.local_backend_status_message", "Setup failed: " + e.getMessage()),
-                        false
-                    ));
-                }
+                localBackendStatusMessage = actionName + " failed: " + e.getMessage();
+                LOGGER.warn("Failed local TranslateGemma {}: {}", actionName, e.getMessage());
+                client.execute(() -> {
+                    if (client.player != null) {
+                        client.player.sendMessage(
+                            Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
+                            false
+                        );
+                    }
+                    if (parent != null) {
+                        client.setScreen(create(parent));
+                    }
+                });
             }
-            client.execute(() -> client.setScreen(create(parent)));
-        }, "chatglot-local-backend-setup");
-        worker.setDaemon(true);
-        worker.start();
-    }
-
-    private static void checkLocalBackendStatus(ChatglotRuntime runtime, ChatglotConfig config) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        Thread worker = new Thread(() -> {
-            LocalBackendStatus status = runtime.localBackendManager().checkStatus(config);
-            if (client.player != null) {
-                client.execute(() -> client.player.sendMessage(
-                    Text.translatable("chatglot.config.local_backend_status_message", status.message()),
-                    false
-                ));
-            }
-        }, "chatglot-local-backend-status");
+        }, "chatglot-local-backend-" + actionName);
         worker.setDaemon(true);
         worker.start();
     }
@@ -1073,4 +1141,7 @@ function jsonResponse(obj) {
         return normalizeLanguageCode(optionCode);
     }
 }
+
+
+
 

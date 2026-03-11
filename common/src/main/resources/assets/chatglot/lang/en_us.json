@@ -91,5 +91,20 @@
   "chatglot.config.azure_region": "Azure region (optional)",
   "chatglot.config.azure_endpoint": "Azure endpoint",
   "key.chatglot.open_config": "Open Chatglot Settings",
-  "key.categories.chatglot.main": "Chatglot"
+  "key.categories.chatglot.main": "Chatglot",
+  "chatglot.config.category.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.provider.translategemma_local": "Local TranslateGemma",
+  "chatglot.config.local_backend_windows_only": "Windows only (first version). Uses an external local backend process over localhost HTTP.",
+  "chatglot.config.local_backend_manual_model_notice": "Model download is manual in this version. Select an existing local model path.",
+  "chatglot.config.local_backend_base_url": "Backend base URL (optional)",
+  "chatglot.config.local_backend_port": "Backend port",
+  "chatglot.config.local_backend_shared_dir": "Shared install dir (blank=LOCALAPPDATA)",
+  "chatglot.config.local_backend_command": "Backend command path (blank=runtime/chatglot-local-backend.cmd)",
+  "chatglot.config.local_backend_model_path": "Model file path",
+  "chatglot.config.local_backend_model_alias": "Model alias/name",
+  "chatglot.config.local_backend_resolved_url": "Backend URL: %s",
+  "chatglot.config.local_backend_resolved_shared_dir": "Shared directory: %s",
+  "chatglot.config.local_backend_setup": "Setup local backend",
+  "chatglot.config.local_backend_status": "Check status",
+  "chatglot.config.local_backend_status_message": "[Local TranslateGemma] %s"
 }

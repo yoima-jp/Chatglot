@@ -10,7 +10,7 @@ Chatglot は Minecraft チャットを翻訳する Fabric クライアント MOD
 - 自動翻訳（Lingua による言語判定）
 - 翻訳結果を新規行表示、または原文チャットを置換
 - プロバイダ切り替え  
-  `default` / `gas` / `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure`
+  `default` / `gas` / `deepl` / `google` / `codex` / `openai` / `gemini` / `anthropic` / `azure` / `translategemma_local`
 - Cloth Config + ModMenu でゲーム内設定
 - `F8` キーで設定画面を直接オープン
 
@@ -65,7 +65,7 @@ macOS / Linux の場合:
 - `showTranslationPrefix`: `【翻訳】➡` プレフィックスの表示/非表示
 - `targetLanguage`: 例 `JA`, `EN`, `EN-US`, `ZH-HANS`  
   初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
-- `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure`
+- `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure|translategemma_local`
 - `requestTimeoutSeconds`: 通信タイムアウト秒（5〜240）
 - `maxConcurrentTranslations`: 同時に進める翻訳数の上限（1〜16）
 
@@ -79,6 +79,8 @@ macOS / Linux の場合:
 - `geminiApiKey`, `geminiModel`
 - `anthropicApiKey`, `anthropicModel`
 - `azureTranslatorApiKey`, `azureTranslatorRegion`, `azureTranslatorEndpoint`
+- `localBackendBaseUrl`, `localBackendPort`, `localBackendSharedDirectory`, `localBackendCommand`
+- `localModelPath`, `localModelAlias`
 
 ## プロバイダ補足
 
@@ -87,6 +89,11 @@ macOS / Linux の場合:
 - `gas` は自分でデプロイした GAS Web アプリ URL（`.../exec`）を使用します。
 - `codex` は初回利用時にブラウザ OAuth を行い、`http://localhost:1455/auth/callback` で認証を受け取ります。
 - モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
+- `translategemma_local` は **外部ローカルバックエンドプロセス** を localhost HTTP で利用します（Minecraft JVM 内では推論しません）。
+- 初期版は Windows のみ対応です。既定共有ディレクトリは `%LOCALAPPDATA%\ChatglotLocal\` です。
+- 共有ディレクトリには `runtime/`, `models/`, `data/`, `logs/`, `state.json` を作成し、複数インスタンスで共有します。
+- モデル取得は初期版では手動です（UI で既存モデルファイルパスを指定）。
+- トークン埋め込み・自動ダウンロード（gated model 含む）は行いません。
 
 ## GAS 連携手順
 

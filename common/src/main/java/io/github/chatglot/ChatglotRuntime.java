@@ -47,7 +47,7 @@ public final class ChatglotRuntime {
         this.geminiModelCatalogService = new GeminiModelCatalogService(configDir);
         this.anthropicModelCatalogService = new AnthropicModelCatalogService(configDir);
         this.providerRegistry = new TranslationProviderRegistry();
-        this.localBackendManager = new LocalBackendManager();
+        this.localBackendManager = new LocalBackendManager(configDir);
         this.providerRegistry.register(new DeepLTranslationProvider());
         this.providerRegistry.register(new GoogleTranslationProvider());
         this.providerRegistry.register(new GasTranslationProvider());

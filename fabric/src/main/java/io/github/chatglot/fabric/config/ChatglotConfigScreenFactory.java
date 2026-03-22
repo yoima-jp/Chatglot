@@ -1,8 +1,8 @@
 package io.github.chatglot.fabric.config;
 
 import io.github.chatglot.ChatglotRuntime;
-import io.github.chatglot.ChatglotConstants;
 import io.github.chatglot.config.ChatglotConfig;
+import io.github.chatglot.config.ChatglotStoragePaths;
 import io.github.chatglot.fabric.config.entry.CodexAuthButtonEntry;
 import io.github.chatglot.localbackend.LocalBackendPaths;
 import io.github.chatglot.localbackend.LocalBackendStatus;
@@ -104,8 +104,7 @@ function jsonResponse(obj) {
 }
     """;
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
-    private static final String CODEX_TOKEN_FILENAME = "codex_tokens.json";
-    private static volatile String localBackendStatusMessage = "";
+    private static volatile Text localBackendStatusMessage = Text.empty();
 
     private enum ProviderOption {
         DEFAULT("default"),
@@ -259,10 +258,42 @@ function jsonResponse(obj) {
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
         ConfigCategory general = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.general"));
+        ProviderOption providerOption = ProviderOption.fromConfigValue(config.provider);
         general.addEntry(
             entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.enabled"), config.enabled)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.enabled = value)
+                .build()
+        );
+        general.addEntry(
+            entryBuilder.startEnumSelector(Text.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
+                .setDefaultValue(ProviderOption.DEFAULT)
+                .setEnumNameProvider(option -> Text.translatable("chatglot.config.provider." + option.name().toLowerCase(Locale.ROOT)))
+                .setSaveConsumer(value -> {
+                    config.provider = value.id();
+                    if (value == ProviderOption.DEFAULT) {
+                        config.autoTranslateEnabledWhenSupported = false;
+                        config.autoTranslateEnabled = false;
+                    } else if (config.autoTranslateEnabledWhenSupported) {
+                        config.autoTranslateEnabled = true;
+                    }
+                })
+                .build()
+        );
+        general.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.provider_notice")).build());
+        general.addEntry(
+            entryBuilder
+                .startDropdownMenu(
+                    Text.translatable("chatglot.config.target_language"),
+                    selectedLanguageOption,
+                    value -> resolveLanguageOptionFromInput(value, selectableLanguageOptions, selectedLanguageOption),
+                    value -> Text.literal(value.label()),
+                    DropdownMenuBuilder.CellCreatorBuilder.of(value -> Text.literal(value.label()))
+                )
+                .setSelections(selectableLanguageOptions)
+                .setDefaultValue(defaultLanguageOption)
+                .setSuggestionMode(false)
+                .setSaveConsumer(value -> config.targetLanguage = toStoredTargetLanguage(value.code()))
                 .build()
         );
         general.addEntry(
@@ -316,36 +347,14 @@ function jsonResponse(obj) {
         );
         general.addEntry(
             entryBuilder
-                .startDropdownMenu(
-                    Text.translatable("chatglot.config.target_language"),
-                    selectedLanguageOption,
-                    value -> resolveLanguageOptionFromInput(value, selectableLanguageOptions, selectedLanguageOption),
-                    value -> Text.literal(value.label()),
-                    DropdownMenuBuilder.CellCreatorBuilder.of(value -> Text.literal(value.label()))
+                .startBooleanToggle(
+                    Text.translatable("chatglot.config.use_shared_appdata_settings"),
+                    config.useSharedAppDataSettings
                 )
-                .setSelections(selectableLanguageOptions)
-                .setDefaultValue(defaultLanguageOption)
-                .setSuggestionMode(false)
-                .setSaveConsumer(value -> config.targetLanguage = toStoredTargetLanguage(value.code()))
+                .setDefaultValue(false)
+                .setSaveConsumer(value -> config.useSharedAppDataSettings = value)
                 .build()
         );
-        ProviderOption providerOption = ProviderOption.fromConfigValue(config.provider);
-        general.addEntry(
-            entryBuilder.startEnumSelector(Text.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
-                .setDefaultValue(ProviderOption.DEFAULT)
-                .setEnumNameProvider(option -> Text.translatable("chatglot.config.provider." + option.name().toLowerCase(Locale.ROOT)))
-                .setSaveConsumer(value -> {
-                    config.provider = value.id();
-                    if (value == ProviderOption.DEFAULT) {
-                        config.autoTranslateEnabledWhenSupported = false;
-                        config.autoTranslateEnabled = false;
-                    } else if (config.autoTranslateEnabledWhenSupported) {
-                        config.autoTranslateEnabled = true;
-                    }
-                })
-                .build()
-        );
-        general.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.provider_notice")).build());
         general.addEntry(
             entryBuilder.startIntField(Text.translatable("chatglot.config.request_timeout"), config.requestTimeoutSeconds)
                 .setDefaultValue(45)
@@ -599,20 +608,14 @@ function jsonResponse(obj) {
         );
         localGemma.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_setup"),
-                () -> setupLocalBackend(runtime, config, parent)
+                Text.translatable("chatglot.config.local_backend_download_all"),
+                () -> downloadAllAndStartLocalBackend(runtime, config, parent)
             )
         );
         localGemma.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_download_model"),
-                () -> downloadLocalModel(runtime, config, parent)
-            )
-        );
-        localGemma.addEntry(
-            new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_status"),
-                () -> checkLocalBackendStatus(runtime, config, parent)
+                Text.translatable("chatglot.config.local_backend_advanced"),
+                () -> MinecraftClient.getInstance().setScreen(createLocalBackendAdvancedScreen(create(parent)))
             )
         );
         localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_windows_only")).build());
@@ -663,7 +666,7 @@ function jsonResponse(obj) {
                 .setSaveConsumer(value -> config.localModelAlias = normalizeModelValue(value))
                 .build()
         );
-        String resolvedSharedDir = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory).toString();
+        String resolvedSharedDir = LocalBackendPaths.resolveSharedRoot(config, runtime.configDir()).toString();
         String resolvedBackendUrl = (config.localBackendBaseUrl == null || config.localBackendBaseUrl.isBlank())
             ? "http://127.0.0.1:" + config.localBackendPort
             : config.localBackendBaseUrl.trim();
@@ -676,12 +679,20 @@ function jsonResponse(obj) {
         localGemma.addEntry(
             entryBuilder.startTextDescription(
                 Text.translatable(
-                    "chatglot.config.local_backend_log_file",
-                    LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory)).toString()
+                    "chatglot.config.local_backend_resolved_model_path",
+                    LocalBackendPaths.resolveModelPath(config, LocalBackendPaths.resolveSharedRoot(config, runtime.configDir())).toString()
                 )
             ).build()
         );
-        if (!localBackendStatusMessage.isBlank()) {
+        localGemma.addEntry(
+            entryBuilder.startTextDescription(
+                Text.translatable(
+                    "chatglot.config.local_backend_log_file",
+                    LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config, runtime.configDir())).toString()
+                )
+            ).build()
+        );
+        if (!localBackendStatusMessage.getString().isBlank()) {
             localGemma.addEntry(
                 entryBuilder.startTextDescription(
                     Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage)
@@ -715,6 +726,45 @@ function jsonResponse(obj) {
                 .build()
         );
 
+        return builder.build();
+    }
+
+    private static Screen createLocalBackendAdvancedScreen(Screen parent) {
+        ChatglotRuntime runtime = ChatglotRuntime.get();
+        ChatglotConfig config = runtime.configManager().get();
+
+        ConfigBuilder builder = ConfigBuilder.create()
+            .setParentScreen(parent)
+            .setTitle(Text.translatable("chatglot.config.local_backend_advanced"));
+
+        ConfigEntryBuilder entryBuilder = builder.entryBuilder();
+        ConfigCategory category = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
+
+        category.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_setup"),
+                () -> setupLocalBackend(runtime, config, parent)
+            )
+        );
+        category.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_download_model"),
+                () -> downloadLocalModel(runtime, config, parent)
+            )
+        );
+        category.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_reinstall_model"),
+                () -> reinstallLocalModel(runtime, config, parent)
+            )
+        );
+        category.addEntry(
+            new CodexAuthButtonEntry(
+                Text.translatable("chatglot.config.local_backend_status"),
+                () -> checkLocalBackendStatus(runtime, config, parent)
+            )
+        );
+        category.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_advanced_notice")).build());
         return builder.build();
     }
 
@@ -861,7 +911,7 @@ function jsonResponse(obj) {
         if (config.codexTokenFile != null && !config.codexTokenFile.isBlank()) {
             return Path.of(config.codexTokenFile.trim());
         }
-        return runtime.configDir().resolve(ChatglotConstants.MOD_ID).resolve(CODEX_TOKEN_FILENAME);
+        return ChatglotStoragePaths.resolveDefaultCodexTokenFile(config, runtime.configDir());
     }
 
     private static void refreshOpenAiModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
@@ -942,8 +992,20 @@ function jsonResponse(obj) {
             runtime,
             config,
             parent,
-            progress -> runtime.localBackendManager().setupAndStart(config, progress),
-            "setup"
+            progress -> runtime.localBackendManager().downloadRuntime(config, progress),
+            "setup",
+            true
+        );
+    }
+
+    private static void downloadAllAndStartLocalBackend(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        runLocalBackendAction(
+            runtime,
+            config,
+            parent,
+            progress -> runtime.localBackendManager().downloadAllAndStart(config, progress),
+            "download-all",
+            true
         );
     }
 
@@ -953,16 +1015,28 @@ function jsonResponse(obj) {
             config,
             parent,
             progress -> runtime.localBackendManager().downloadModel(config, progress),
-            "download"
+            "download",
+            true
+        );
+    }
+
+    private static void reinstallLocalModel(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
+        runLocalBackendAction(
+            runtime,
+            config,
+            parent,
+            progress -> runtime.localBackendManager().reinstallModel(config, progress),
+            "reinstall",
+            true
         );
     }
 
     private static void checkLocalBackendStatus(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        runLocalBackendAction(runtime, config, parent, progress -> runtime.localBackendManager().checkStatus(config), "status");
+        runLocalBackendAction(runtime, config, parent, progress -> runtime.localBackendManager().checkStatus(config), "status", false);
     }
 
     private interface LocalBackendAction {
-        LocalBackendStatus run(java.util.function.Consumer<String> progressListener) throws Exception;
+        LocalBackendStatus run(java.util.function.Consumer<Text> progressListener) throws Exception;
     }
 
     private static void runLocalBackendAction(
@@ -970,18 +1044,30 @@ function jsonResponse(obj) {
         ChatglotConfig config,
         Screen parent,
         LocalBackendAction action,
-        String actionName
+        String actionName,
+        boolean suspendAutoTranslate
     ) {
         MinecraftClient client = MinecraftClient.getInstance();
-        updateLocalBackendProgress(client, parent, actionName + " started...", true);
+        updateLocalBackendProgress(client, parent, Text.translatable("chatglot.local_backend.action_started", actionName), true);
         Thread worker = new Thread(() -> {
-            java.util.function.Consumer<String> progressListener = message ->
+            java.util.function.Consumer<Text> progressListener = message ->
                 updateLocalBackendProgress(client, parent, message, true);
+            boolean previousAutoTranslateEnabled = config.autoTranslateEnabled;
+            boolean previousAutoTranslateEnabledWhenSupported = config.autoTranslateEnabledWhenSupported;
             try {
+                if (suspendAutoTranslate) {
+                    config.autoTranslateEnabled = false;
+                    config.autoTranslateEnabledWhenSupported = false;
+                    runtime.configManager().save();
+                    progressListener.accept(io.github.chatglot.localbackend.LocalBackendTexts.autoTranslateTemporarilyDisabled());
+                }
                 config.sanitize();
                 runtime.configManager().save();
                 LocalBackendStatus status = action.run(progressListener);
                 localBackendStatusMessage = status.message();
+                if (suspendAutoTranslate) {
+                    restoreAutoTranslate(runtime, config, previousAutoTranslateEnabled, previousAutoTranslateEnabledWhenSupported);
+                }
                 client.execute(() -> {
                     if (client.player != null) {
                         client.player.sendMessage(
@@ -994,7 +1080,10 @@ function jsonResponse(obj) {
                     }
                 });
             } catch (Exception e) {
-                localBackendStatusMessage = actionName + " failed: " + e.getMessage();
+                if (suspendAutoTranslate) {
+                    restoreAutoTranslate(runtime, config, previousAutoTranslateEnabled, previousAutoTranslateEnabledWhenSupported);
+                }
+                localBackendStatusMessage = Text.translatable("chatglot.local_backend.action_failed", actionName, e.getMessage());
                 LOGGER.warn("Failed local TranslateGemma {}: {}", actionName, e.getMessage());
                 client.execute(() -> {
                     if (client.player != null) {
@@ -1013,17 +1102,30 @@ function jsonResponse(obj) {
         worker.start();
     }
 
+    private static void restoreAutoTranslate(
+        ChatglotRuntime runtime,
+        ChatglotConfig config,
+        boolean previousAutoTranslateEnabled,
+        boolean previousAutoTranslateEnabledWhenSupported
+    ) {
+        config.autoTranslateEnabled = previousAutoTranslateEnabled;
+        config.autoTranslateEnabledWhenSupported = previousAutoTranslateEnabledWhenSupported;
+        config.sanitize();
+        runtime.configManager().save();
+    }
+
     private static volatile String lastLocalBackendChatMessage = "";
 
-    private static void updateLocalBackendProgress(MinecraftClient client, Screen parent, String message, boolean sendChatMessage) {
+    private static void updateLocalBackendProgress(MinecraftClient client, Screen parent, Text message, boolean sendChatMessage) {
         localBackendStatusMessage = message;
         if (client == null) {
             return;
         }
 
         client.execute(() -> {
-            if (sendChatMessage && client.player != null && !message.equals(lastLocalBackendChatMessage)) {
-                lastLocalBackendChatMessage = message;
+            String plain = message.getString();
+            if (sendChatMessage && client.player != null && !plain.equals(lastLocalBackendChatMessage)) {
+                lastLocalBackendChatMessage = plain;
                 client.player.sendMessage(
                     Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
                     false

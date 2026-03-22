@@ -1,22 +1,30 @@
 package io.github.chatglot.localbackend;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Instant;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import net.minecraft.text.Text;
 
 public final class LocalBackendInstaller {
-    private static final String LLAMA_CPP_WINGET_ID = "ggml.llamacpp";
+    private static final String LLAMA_CPP_RELEASE_API_URL = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
+    private static final String WINDOWS_CPU_ASSET_MARKER = "-bin-win-cpu-x64.zip";
 
     private final HttpClient httpClient = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
 
@@ -37,73 +45,56 @@ public final class LocalBackendInstaller {
         Files.writeString(
             readme,
             "Chatglot installs TranslateGemma support via llama.cpp.\n"
-                + "Setup from the config screen installs llama.cpp with winget and downloads the default GGUF model.\n"
+                + "Setup from the config screen downloads llama.cpp into this runtime directory and downloads the default GGUF model.\n"
                 + "If you want to override the runtime, set 'Backend command path override' in Chatglot settings.\n"
         );
     }
 
     public Path ensureRuntime(ChatglotConfig config) throws IOException {
-        return ensureRuntime(config, message -> {
-        });
+        throw new UnsupportedOperationException("Use ensureRuntime(config, sharedRoot, progressListener)");
     }
 
-    public boolean isRuntimeReady(ChatglotConfig config) {
-        if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
-            return Files.exists(Path.of(config.localBackendCommand.trim()));
-        }
-
-        try {
-            return findLlamaServerExecutable() != null;
-        } catch (IOException e) {
-            return false;
-        }
+    public boolean isRuntimeReady(ChatglotConfig config, Path sharedRoot) {
+        return resolveInstalledRuntime(config, sharedRoot) != null;
     }
 
-    public Path ensureRuntime(ChatglotConfig config, Consumer<String> progressListener) throws IOException {
+    public Path ensureRuntime(ChatglotConfig config, Path sharedRoot, Consumer<Text> progressListener) throws IOException {
         if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
             Path override = Path.of(config.localBackendCommand.trim());
             if (!Files.exists(override)) {
                 throw new IOException("Configured backend command was not found: " + override);
             }
-            progressListener.accept("Using backend command override: " + override);
+            progressListener.accept(LocalBackendTexts.usingRuntimeOverride(override.toString()));
             return override;
         }
 
-        Path discovered = findLlamaServerExecutable();
-        if (discovered != null) {
-            progressListener.accept("Found llama.cpp runtime: " + discovered);
-            return discovered;
+        Path stagedRuntime = findManagedRuntime(sharedRoot);
+        if (stagedRuntime != null) {
+            progressListener.accept(LocalBackendTexts.usingManagedRuntime(stagedRuntime.toString()));
+            return stagedRuntime;
         }
 
-        progressListener.accept("Installing llama.cpp with winget...");
-        List<String> command = List.of(
-            "winget",
-            "install",
-            "-e",
-            "--id",
-            LLAMA_CPP_WINGET_ID,
-            "--accept-package-agreements",
-            "--accept-source-agreements",
-            "--disable-interactivity"
-        );
-        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
-        try {
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                String output = new String(process.getInputStream().readAllBytes());
-                throw new IOException("Command failed (" + exitCode + "): " + String.join(" ", command) + "\n" + output);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("winget install was interrupted.", e);
-        }
+        progressListener.accept(LocalBackendTexts.downloadingManagedRuntime());
+        String assetUrl = resolveLatestWindowsCpuAssetUrl();
+        Path runtimeDir = LocalBackendPaths.runtimeDir(sharedRoot);
+        Path dataDir = LocalBackendPaths.dataDir(sharedRoot);
+        Files.createDirectories(runtimeDir);
+        Files.createDirectories(dataDir);
+        Path archivePath = dataDir.resolve("llama.cpp-windows-x64.zip.part");
+        Path finalArchivePath = dataDir.resolve("llama.cpp-windows-x64.zip");
+        Files.deleteIfExists(archivePath);
+        downloadToFile(assetUrl, archivePath, Duration.ofMinutes(10), "Runtime download", progressListener);
 
-        discovered = findLlamaServerExecutable();
-        if (discovered != null) {
-            progressListener.accept("Installed llama.cpp runtime: " + discovered);
-            return discovered;
+        clearRuntimeDirectory(runtimeDir);
+        extractZip(archivePath, runtimeDir);
+        Files.move(archivePath, finalArchivePath, StandardCopyOption.REPLACE_EXISTING);
+
+        stagedRuntime = findManagedRuntime(sharedRoot);
+        if (stagedRuntime != null) {
+            progressListener.accept(LocalBackendTexts.downloadedManagedRuntime(stagedRuntime.toString()));
+            return stagedRuntime;
         }
-        throw new IOException("Installed llama.cpp with winget, but llama-server.exe was not found. Check " + LocalBackendPaths.wingetPackagesDir());
+        throw new IOException("Downloaded llama.cpp runtime archive, but llama-server.exe was not found in " + runtimeDir);
     }
 
     public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot) throws IOException {
@@ -111,10 +102,10 @@ public final class LocalBackendInstaller {
         });
     }
 
-    public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot, Consumer<String> progressListener) throws IOException {
+    public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot, Consumer<Text> progressListener) throws IOException {
         Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
         if (Files.exists(modelPath) && Files.size(modelPath) > 0) {
-            progressListener.accept("Model already present: " + modelPath);
+            progressListener.accept(LocalBackendTexts.modelAlreadyPresent(modelPath.toString()));
             return modelPath;
         }
         if (config.localModelDownloadUrl == null || config.localModelDownloadUrl.isBlank()) {
@@ -124,25 +115,9 @@ public final class LocalBackendInstaller {
         Files.createDirectories(modelPath.getParent());
         Path tempPath = modelPath.resolveSibling(modelPath.getFileName() + ".part");
         Files.deleteIfExists(tempPath);
-        progressListener.accept("Downloading model from " + config.localModelDownloadUrl.trim());
+        progressListener.accept(LocalBackendTexts.downloadingModel(config.localModelDownloadUrl.trim()));
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(config.localModelDownloadUrl.trim()))
-            .timeout(Duration.ofMinutes(30))
-            .header("User-Agent", "Chatglot")
-            .GET()
-            .build();
-
-        try {
-            HttpResponse<Path> response = httpClient.send(request, HttpResponse.BodyHandlers.ofFile(tempPath));
-            if (response.statusCode() >= 400) {
-                Files.deleteIfExists(tempPath);
-                throw new IOException("Model download failed with HTTP " + response.statusCode());
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            Files.deleteIfExists(tempPath);
-            throw new IOException("Model download was interrupted.", e);
-        }
+        downloadToFile(config.localModelDownloadUrl.trim(), tempPath, Duration.ofMinutes(30), "Model download", progressListener);
 
         try {
             Files.move(tempPath, modelPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -152,45 +127,222 @@ public final class LocalBackendInstaller {
             } catch (IOException moveError) {
                 if (Files.exists(modelPath) && Files.size(modelPath) > 0) {
                     Files.deleteIfExists(tempPath);
-                    progressListener.accept("Model download finished: " + modelPath);
+                    progressListener.accept(LocalBackendTexts.modelDownloadFinished(modelPath.toString()));
                     return modelPath;
                 }
                 throw new IOException("Failed to finalize downloaded model file: " + moveError.getMessage(), moveError);
             }
         }
-        progressListener.accept("Model download finished: " + modelPath);
+        progressListener.accept(LocalBackendTexts.modelDownloadFinished(modelPath.toString()));
         return modelPath;
     }
 
-    private static Path findLlamaServerExecutable() throws IOException {
-        List<Path> candidates = new ArrayList<>();
-        candidates.add(LocalBackendPaths.wingetLinksDir().resolve("llama-server.exe"));
+    private String resolveLatestWindowsCpuAssetUrl() throws IOException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(LLAMA_CPP_RELEASE_API_URL))
+            .timeout(Duration.ofSeconds(30))
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "Chatglot")
+            .GET()
+            .build();
 
-        String pathEnv = System.getenv("PATH");
-        if (pathEnv != null && !pathEnv.isBlank()) {
-            for (String rawSegment : pathEnv.split(";")) {
-                if (rawSegment == null || rawSegment.isBlank()) {
+        HttpResponse<String> response;
+        try {
+            response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("llama.cpp release lookup was interrupted.", e);
+        }
+
+        if (response.statusCode() >= 400) {
+            throw new IOException("Failed to resolve llama.cpp release asset: HTTP " + response.statusCode());
+        }
+
+        JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+        JsonArray assets = root.getAsJsonArray("assets");
+        if (assets == null) {
+            throw new IOException("llama.cpp release response did not include assets.");
+        }
+
+        for (JsonElement assetElement : assets) {
+            if (!assetElement.isJsonObject()) {
+                continue;
+            }
+            JsonObject asset = assetElement.getAsJsonObject();
+            String name = asset.has("name") ? asset.get("name").getAsString() : "";
+            if (!name.endsWith(WINDOWS_CPU_ASSET_MARKER)) {
+                continue;
+            }
+            if (!asset.has("browser_download_url")) {
+                continue;
+            }
+            return asset.get("browser_download_url").getAsString();
+        }
+
+        throw new IOException("Could not find a Windows x64 CPU llama.cpp runtime asset in the latest release.");
+    }
+
+    private void downloadToFile(
+        String url,
+        Path destination,
+        Duration timeout,
+        String progressLabel,
+        Consumer<Text> progressListener
+    ) throws IOException {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+            .timeout(timeout)
+            .header("User-Agent", "Chatglot")
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            if (response.statusCode() >= 400) {
+                Files.deleteIfExists(destination);
+                throw new IOException(progressLabel + " failed with HTTP " + response.statusCode());
+            }
+            long contentLength = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+            try (InputStream input = response.body()) {
+                writeStreamToFile(input, destination, contentLength, progressLabel, progressListener);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            Files.deleteIfExists(destination);
+            throw new IOException(progressLabel + " was interrupted.", e);
+        }
+    }
+
+    private static void writeStreamToFile(
+        InputStream input,
+        Path destination,
+        long contentLength,
+        String progressLabel,
+        Consumer<Text> progressListener
+    ) throws IOException {
+        Files.createDirectories(destination.getParent());
+        byte[] buffer = new byte[8192];
+        long downloaded = 0L;
+        int lastPercent = -1;
+        Instant lastUpdate = Instant.EPOCH;
+
+        try (var output = Files.newOutputStream(destination)) {
+            int read;
+            while ((read = input.read(buffer)) >= 0) {
+                if (read == 0) {
                     continue;
                 }
-                candidates.add(Path.of(rawSegment.trim()).resolve("llama-server.exe"));
+                output.write(buffer, 0, read);
+                downloaded += read;
+                if (contentLength > 0) {
+                    int percent = (int) Math.min(100, (downloaded * 100) / contentLength);
+                    Instant now = Instant.now();
+                    if (percent != lastPercent && (percent == 100 || percent / 5 != lastPercent / 5 || Duration.between(lastUpdate, now).toMillis() >= 1000)) {
+                        progressListener.accept(
+                            LocalBackendTexts.downloadProgress(
+                                progressLabel,
+                                percent + "%",
+                                humanReadableBytes(downloaded),
+                                humanReadableBytes(contentLength)
+                            )
+                        );
+                        lastPercent = percent;
+                        lastUpdate = now;
+                    }
+                } else {
+                    Instant now = Instant.now();
+                    if (Duration.between(lastUpdate, now).toMillis() >= 1000) {
+                        progressListener.accept(LocalBackendTexts.downloadProgressUnknown(progressLabel, humanReadableBytes(downloaded)));
+                        lastUpdate = now;
+                    }
+                }
             }
+        } catch (IOException e) {
+            Files.deleteIfExists(destination);
+            throw e;
+        }
+    }
+
+    private static void clearRuntimeDirectory(Path runtimeDir) throws IOException {
+        if (!Files.isDirectory(runtimeDir)) {
+            return;
         }
 
-        Path packagesDir = LocalBackendPaths.wingetPackagesDir();
-        if (Files.isDirectory(packagesDir)) {
-            try (DirectoryStream<Path> packages = Files.newDirectoryStream(packagesDir, "ggml.llamacpp*")) {
-                for (Path packageDir : packages) {
-                    candidates.add(packageDir.resolve("llama-server.exe"));
-                    candidates.add(packageDir.resolve("llama-bundle").resolve("llama-server.exe"));
+        try (Stream<Path> stream = Files.list(runtimeDir)) {
+            for (Path child : stream.toList()) {
+                deleteRecursively(child);
+            }
+        }
+    }
+
+    private static void deleteRecursively(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        if (Files.isDirectory(path)) {
+            try (Stream<Path> stream = Files.list(path)) {
+                for (Path child : stream.toList()) {
+                    deleteRecursively(child);
                 }
             }
         }
+        Files.deleteIfExists(path);
+    }
 
-        for (Path candidate : candidates) {
-            if (Files.exists(candidate)) {
-                return candidate;
+    private static void extractZip(Path archivePath, Path destinationDir) throws IOException {
+        try (InputStream inputStream = Files.newInputStream(archivePath); ZipInputStream zip = new ZipInputStream(inputStream)) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                Path output = destinationDir.resolve(entry.getName()).normalize();
+                if (!output.startsWith(destinationDir.normalize())) {
+                    throw new IOException("Unexpected archive entry outside destination: " + entry.getName());
+                }
+
+                if (entry.isDirectory()) {
+                    Files.createDirectories(output);
+                    continue;
+                }
+
+                Files.createDirectories(output.getParent());
+                Files.copy(zip, output, StandardCopyOption.REPLACE_EXISTING);
             }
         }
-        return null;
+    }
+
+    public Path findManagedRuntime(Path sharedRoot) {
+        Path runtimeDir = LocalBackendPaths.runtimeDir(sharedRoot);
+        if (!Files.isDirectory(runtimeDir)) {
+            return null;
+        }
+
+        try (Stream<Path> stream = Files.walk(runtimeDir)) {
+            return stream
+                .filter(Files::isRegularFile)
+                .filter(path -> "llama-server.exe".equalsIgnoreCase(path.getFileName().toString()))
+                .findFirst()
+                .orElse(null);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    public Path resolveInstalledRuntime(ChatglotConfig config, Path sharedRoot) {
+        if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
+            Path override = Path.of(config.localBackendCommand.trim());
+            return Files.exists(override) ? override : null;
+        }
+        return findManagedRuntime(sharedRoot);
+    }
+
+    private static String humanReadableBytes(long bytes) {
+        if (bytes < 1024) {
+            return bytes + " B";
+        }
+        double value = bytes;
+        String[] units = { "KB", "MB", "GB", "TB" };
+        int unitIndex = -1;
+        while (value >= 1024 && unitIndex + 1 < units.length) {
+            value /= 1024.0;
+            unitIndex++;
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f %s", value, units[Math.max(unitIndex, 0)]);
     }
 }

@@ -1,22 +1,31 @@
 package io.github.chatglot.localbackend;
 
 import io.github.chatglot.config.ChatglotConfig;
+import io.github.chatglot.config.ChatglotStoragePaths;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
+import net.minecraft.text.Text;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class LocalBackendManager {
     private static final Logger LOGGER = LoggerFactory.getLogger("Chatglot/LocalBackend");
 
+    private final Path configDir;
     private final LocalBackendInstaller installer = new LocalBackendInstaller();
     private final LocalBackendHealthChecker healthChecker = new LocalBackendHealthChecker();
+
+    public LocalBackendManager(Path configDir) {
+        this.configDir = configDir;
+    }
 
     public CompletableFuture<LocalBackendStatus> setupAndStartAsync(ChatglotConfig config) {
         return CompletableFuture.supplyAsync(() -> {
@@ -38,19 +47,20 @@ public final class LocalBackendManager {
 
     public void applyConfiguredBackendPolicy(ChatglotConfig config) {
         config.sanitize();
-        cleanupOrphanedBackend(config);
+        cleanupKnownBackends(config);
         if (isLocalProviderSelected(config)) {
+            stopManagedBackendsExceptCurrent(config);
             ensureBackendAvailable(config);
             return;
         }
-        stopManagedBackend(config);
+        stopAllManagedBackends(config);
     }
 
     public LocalBackendStatus checkStatus(ChatglotConfig config) {
-        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
-            return new LocalBackendStatus(false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), "Unsupported OS. Local TranslateGemma is currently Windows-only.");
+            return new LocalBackendStatus("unsupported_os", false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.unsupportedOs());
         }
 
         LocalBackendState state = new LocalBackendStateStore(sharedRoot).load();
@@ -58,18 +68,18 @@ public final class LocalBackendManager {
         boolean healthy = healthChecker.isHealthy(baseUrl, Math.min(10, config.requestTimeoutSeconds));
         boolean running = isProcessAlive(state.pid);
         boolean modelPresent = Files.exists(modelPath);
-        String runtimeMessage = resolveRuntimeMessage(config);
-        String message;
+        Text runtimeMessage = resolveRuntimeMessage(config, sharedRoot);
+        Text message;
         if (healthy) {
-            message = "Backend is healthy. " + runtimeMessage + " Model: " + modelPath;
+            message = LocalBackendTexts.backendHealthy(runtimeMessage, modelPath.toString());
         } else if (running) {
-            message = "Backend is still starting. " + runtimeMessage + " Model: " + modelPath;
+            message = LocalBackendTexts.backendStarting(runtimeMessage, modelPath.toString());
         } else if (!modelPresent) {
-            message = "Backend is not reachable. " + runtimeMessage + " Model is missing: " + modelPath;
+            message = LocalBackendTexts.backendNotReachableMissingModel(runtimeMessage, modelPath.toString());
         } else {
-            message = "Backend is not reachable. " + runtimeMessage + " Model: " + modelPath;
+            message = LocalBackendTexts.backendNotReachable(runtimeMessage, modelPath.toString());
         }
-        return new LocalBackendStatus(true, healthy, running, baseUrl, sharedRoot, modelPath.toString(), message);
+        return new LocalBackendStatus("status", true, healthy, running, baseUrl, sharedRoot, modelPath.toString(), message);
     }
 
     public LocalBackendStatus setupAndStart(ChatglotConfig config) throws IOException {
@@ -77,26 +87,49 @@ public final class LocalBackendManager {
         });
     }
 
-    public LocalBackendStatus setupAndStart(ChatglotConfig config, Consumer<String> progressListener) throws IOException {
-        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+    public LocalBackendStatus setupAndStart(ChatglotConfig config, Consumer<Text> progressListener) throws IOException {
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
-            return new LocalBackendStatus(false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), "Unsupported OS. Local TranslateGemma is currently Windows-only.");
+            return new LocalBackendStatus("unsupported_os", false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.unsupportedOs());
         }
 
-        progressListener.accept("Preparing local backend folders...");
+        progressListener.accept(LocalBackendTexts.preparingFolders());
         installer.ensureLayout(sharedRoot);
         installer.ensureRuntimePlaceholder(sharedRoot);
+
+        Path runtimePath = installer.resolveInstalledRuntime(config, sharedRoot);
+        if (runtimePath == null) {
+            return new LocalBackendStatus(
+                "runtime_missing",
+                true,
+                false,
+                false,
+                baseUrl,
+                sharedRoot,
+                LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(),
+                LocalBackendTexts.runtimeMissing()
+            );
+        }
+
+        Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
+        if (!Files.exists(modelPath) || Files.size(modelPath) <= 0) {
+            return new LocalBackendStatus(
+                "model_missing",
+                true,
+                false,
+                false,
+                baseUrl,
+                sharedRoot,
+                modelPath.toString(),
+                LocalBackendTexts.modelMissing()
+            );
+        }
 
         LocalBackendStateStore store = new LocalBackendStateStore(sharedRoot);
         LocalBackendState state = store.load();
         state.port = config.localBackendPort;
-
-        progressListener.accept("Checking llama.cpp runtime...");
-        Path runtimePath = installer.ensureRuntime(config, progressListener);
-        progressListener.accept("Checking TranslateGemma model...");
-        Path modelPath = installer.ensureModelDownloaded(config, sharedRoot, progressListener);
-        state.runtimePath = sharedRoot.toString();
+        state.runtimePath = runtimePath.getParent() == null ? sharedRoot.toString() : runtimePath.getParent().toString();
         state.executablePath = runtimePath.toString();
         state.modelPath = modelPath.toString();
         state.downloadUrl = config.localModelDownloadUrl == null ? "" : config.localModelDownloadUrl.trim();
@@ -104,22 +137,23 @@ public final class LocalBackendManager {
         if (healthChecker.isHealthy(baseUrl, Math.min(10, config.requestTimeoutSeconds))) {
             state.lastKnownHealthyEpochMillis = Instant.now().toEpochMilli();
             store.save(state);
-            return new LocalBackendStatus(true, true, true, baseUrl, sharedRoot, state.modelPath, "Backend already running and healthy. Runtime: " + runtimePath + " Model: " + modelPath);
+            return new LocalBackendStatus("backend_already_healthy", true, true, true, baseUrl, sharedRoot, state.modelPath, LocalBackendTexts.backendAlreadyHealthy(runtimePath.toString(), modelPath.toString()));
         }
 
         if (isProcessAlive(state.pid)) {
             return new LocalBackendStatus(
+                "backend_already_starting",
                 true,
                 false,
                 true,
                 baseUrl,
                 sharedRoot,
                 modelPath.toString(),
-                "Backend is already starting. Please wait a few seconds and try again."
+                LocalBackendTexts.backendAlreadyStarting()
             );
         }
 
-        progressListener.accept("Starting llama-server...");
+        progressListener.accept(LocalBackendTexts.startingServer());
         ProcessBuilder processBuilder = new ProcessBuilder(buildCommand(config, runtimePath, modelPath));
         processBuilder.directory(sharedRoot.toFile());
         processBuilder.redirectErrorStream(true);
@@ -131,12 +165,12 @@ public final class LocalBackendManager {
         store.save(state);
 
         long startedAt = System.currentTimeMillis();
-        progressListener.accept("Waiting for backend health check...");
+        progressListener.accept(LocalBackendTexts.waitingHealthCheck());
         while (System.currentTimeMillis() - startedAt < 15000) {
             if (healthChecker.isHealthy(baseUrl, 2)) {
                 state.lastKnownHealthyEpochMillis = Instant.now().toEpochMilli();
                 store.save(state);
-                return new LocalBackendStatus(true, true, true, baseUrl, sharedRoot, modelPath.toString(), "Backend started and healthy. Runtime: " + runtimePath + " Model: " + modelPath);
+                return new LocalBackendStatus("backend_started_healthy", true, true, true, baseUrl, sharedRoot, modelPath.toString(), LocalBackendTexts.backendStartedHealthy(runtimePath.toString(), modelPath.toString()));
             }
             if (!process.isAlive()) {
                 break;
@@ -149,11 +183,12 @@ public final class LocalBackendManager {
             }
         }
 
-        return new LocalBackendStatus(true, false, process.isAlive(), baseUrl, sharedRoot, modelPath.toString(), "Backend started but health check failed. Check " + LocalBackendPaths.logFile(sharedRoot));
+        return new LocalBackendStatus("backend_healthcheck_failed", true, false, process.isAlive(), baseUrl, sharedRoot, modelPath.toString(), LocalBackendTexts.backendStartedHealthCheckFailed(LocalBackendPaths.logFile(sharedRoot).toString()));
     }
 
     public LocalBackendStatus ensureBackendAvailable(ChatglotConfig config) {
-        cleanupOrphanedBackend(config);
+        cleanupKnownBackends(config);
+        stopManagedBackendsExceptCurrent(config);
         LocalBackendStatus status = checkStatus(config);
         if (status.healthy()) {
             return status;
@@ -161,12 +196,15 @@ public final class LocalBackendManager {
         try {
             return setupAndStart(config);
         } catch (Exception e) {
-            return new LocalBackendStatus(status.supported(), false, false, status.backendUrl(), status.sharedRoot(), status.modelPath(), "Failed to start backend: " + e.getMessage());
+            return new LocalBackendStatus("backend_start_failed", status.supported(), false, false, status.backendUrl(), status.sharedRoot(), status.modelPath(), LocalBackendTexts.backendStartFailed(e.getMessage()));
         }
     }
 
     public void stopManagedBackend(ChatglotConfig config) {
-        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+        stopManagedBackend(LocalBackendPaths.resolveSharedRoot(config, configDir));
+    }
+
+    public void stopManagedBackend(Path sharedRoot) {
         LocalBackendStateStore store = new LocalBackendStateStore(sharedRoot);
         LocalBackendState state = store.load();
         long currentPid = ProcessHandle.current().pid();
@@ -189,7 +227,10 @@ public final class LocalBackendManager {
     }
 
     public void cleanupOrphanedBackend(ChatglotConfig config) {
-        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+        cleanupOrphanedBackend(LocalBackendPaths.resolveSharedRoot(config, configDir));
+    }
+
+    public void cleanupOrphanedBackend(Path sharedRoot) {
         LocalBackendStateStore store = new LocalBackendStateStore(sharedRoot);
         LocalBackendState state = store.load();
         if (state.pid == null || state.ownerPid == null) {
@@ -215,35 +256,139 @@ public final class LocalBackendManager {
         }
     }
 
+    public LocalBackendStatus downloadAllAndStart(ChatglotConfig config) {
+        return downloadAllAndStart(config, message -> {
+        });
+    }
+
+    public LocalBackendStatus downloadAllAndStart(ChatglotConfig config, Consumer<Text> progressListener) {
+        LocalBackendStatus runtimeStatus = downloadRuntime(config, progressListener);
+        if ("runtime_download_failed".equals(runtimeStatus.code()) || "runtime_override_missing".equals(runtimeStatus.code())) {
+            return runtimeStatus;
+        }
+
+        LocalBackendStatus modelStatus = downloadModel(config, progressListener);
+        if ("model_download_failed".equals(modelStatus.code()) || "runtime_missing".equals(modelStatus.code())) {
+            return modelStatus;
+        }
+
+        try {
+            progressListener.accept(LocalBackendTexts.startingAfterDownloads());
+            return setupAndStart(config, progressListener);
+        } catch (Exception e) {
+            return new LocalBackendStatus(
+                "backend_start_after_downloads_failed",
+                modelStatus.supported(),
+                false,
+                false,
+                modelStatus.backendUrl(),
+                modelStatus.sharedRoot(),
+                modelStatus.modelPath(),
+                LocalBackendTexts.backendStartAfterDownloadsFailed(e.getMessage())
+            );
+        }
+    }
+
     public LocalBackendStatus downloadModel(ChatglotConfig config) {
         return downloadModel(config, message -> {
         });
     }
 
-    public LocalBackendStatus downloadModel(ChatglotConfig config, Consumer<String> progressListener) {
-        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config.localBackendSharedDirectory);
+    public LocalBackendStatus downloadRuntime(ChatglotConfig config) {
+        return downloadRuntime(config, message -> {
+        });
+    }
+
+    public LocalBackendStatus downloadRuntime(ChatglotConfig config, Consumer<Text> progressListener) {
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
-            return new LocalBackendStatus(false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), "Unsupported OS. Local TranslateGemma is currently Windows-only.");
+            return new LocalBackendStatus("unsupported_os", false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.unsupportedOs());
         }
-        if (!installer.isRuntimeReady(config)) {
-            return new LocalBackendStatus(
-                true,
-                false,
-                false,
-                baseUrl,
-                sharedRoot,
-                LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(),
-                "Run setup first. Setup installs the local runtime required before downloading or repairing the model."
-            );
+
+        if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
+            Path override = Path.of(config.localBackendCommand.trim());
+            if (Files.exists(override)) {
+                return new LocalBackendStatus("runtime_override_configured", true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.runtimeOverrideConfigured(override.toString()));
+            }
+            return new LocalBackendStatus("runtime_override_missing", true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.runtimeOverrideMissing(override.toString()));
+        }
+
+        try {
+            progressListener.accept(LocalBackendTexts.preparingFolders());
+            installer.ensureLayout(sharedRoot);
+            installer.ensureRuntimePlaceholder(sharedRoot);
+            Path runtimePath = installer.ensureRuntime(config, sharedRoot, progressListener);
+            return new LocalBackendStatus("runtime_ready", true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.runtimeReady(runtimePath.toString()));
+        } catch (Exception e) {
+            return new LocalBackendStatus("runtime_download_failed", true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.runtimeDownloadFailed(e.getMessage()));
+        }
+    }
+
+    public LocalBackendStatus downloadModel(ChatglotConfig config, Consumer<Text> progressListener) {
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
+        String baseUrl = resolveBaseUrl(config);
+        if (!isWindows()) {
+            return new LocalBackendStatus("unsupported_os", false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.unsupportedOs());
         }
         try {
-            progressListener.accept("Preparing local backend folders...");
+            progressListener.accept(LocalBackendTexts.preparingFolders());
             installer.ensureLayout(sharedRoot);
+            installer.ensureRuntimePlaceholder(sharedRoot);
+            if (!installer.isRuntimeReady(config, sharedRoot)) {
+                return new LocalBackendStatus(
+                    "runtime_missing",
+                    true,
+                    false,
+                    false,
+                    baseUrl,
+                    sharedRoot,
+                    LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(),
+                    LocalBackendTexts.runtimeMissing()
+                );
+            }
             Path modelPath = installer.ensureModelDownloaded(config, sharedRoot, progressListener);
-            return new LocalBackendStatus(true, false, false, baseUrl, sharedRoot, modelPath.toString(), "Model is ready: " + modelPath);
+            return new LocalBackendStatus("model_ready", true, false, false, baseUrl, sharedRoot, modelPath.toString(), LocalBackendTexts.modelReady(modelPath.toString()));
         } catch (Exception e) {
-            return new LocalBackendStatus(true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), "Model download failed: " + e.getMessage());
+            return new LocalBackendStatus("model_download_failed", true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.modelDownloadFailed(e.getMessage()));
+        }
+    }
+
+    public LocalBackendStatus reinstallModel(ChatglotConfig config) {
+        return reinstallModel(config, message -> {
+        });
+    }
+
+    public LocalBackendStatus reinstallModel(ChatglotConfig config, Consumer<Text> progressListener) {
+        Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
+        String baseUrl = resolveBaseUrl(config);
+        if (!isWindows()) {
+            return new LocalBackendStatus("unsupported_os", false, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.unsupportedOs());
+        }
+        try {
+            progressListener.accept(LocalBackendTexts.preparingFolders());
+            installer.ensureLayout(sharedRoot);
+            installer.ensureRuntimePlaceholder(sharedRoot);
+            if (!installer.isRuntimeReady(config, sharedRoot)) {
+                return new LocalBackendStatus(
+                    "runtime_missing",
+                    true,
+                    false,
+                    false,
+                    baseUrl,
+                    sharedRoot,
+                    LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(),
+                    LocalBackendTexts.runtimeMissing()
+                );
+            }
+            Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
+            Files.deleteIfExists(modelPath);
+            Files.deleteIfExists(modelPath.resolveSibling(modelPath.getFileName() + ".part"));
+            progressListener.accept(LocalBackendTexts.removedExistingModel(modelPath.toString()));
+            Path downloadedModel = installer.ensureModelDownloaded(config, sharedRoot, progressListener);
+            return new LocalBackendStatus("model_reinstalled", true, false, false, baseUrl, sharedRoot, downloadedModel.toString(), LocalBackendTexts.modelReinstalled(downloadedModel.toString()));
+        } catch (Exception e) {
+            return new LocalBackendStatus("model_reinstall_failed", true, false, false, baseUrl, sharedRoot, LocalBackendPaths.resolveModelPath(config, sharedRoot).toString(), LocalBackendTexts.modelReinstallFailed(e.getMessage()));
         }
     }
 
@@ -262,12 +407,45 @@ public final class LocalBackendManager {
         return "translategemma_local".equalsIgnoreCase(config.provider);
     }
 
-    private String resolveRuntimeMessage(ChatglotConfig config) {
-        try {
-            return "Runtime: " + installer.ensureRuntime(config);
-        } catch (Exception e) {
-            return "Runtime is not ready (" + e.getMessage() + ").";
+    private void cleanupKnownBackends(ChatglotConfig config) {
+        for (Path root : collectKnownManagedRoots(config)) {
+            cleanupOrphanedBackend(root);
         }
+    }
+
+    private void stopAllManagedBackends(ChatglotConfig config) {
+        for (Path root : collectKnownManagedRoots(config)) {
+            stopManagedBackend(root);
+        }
+    }
+
+    private void stopManagedBackendsExceptCurrent(ChatglotConfig config) {
+        Path currentRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
+        for (Path root : collectKnownManagedRoots(config)) {
+            if (!root.equals(currentRoot)) {
+                stopManagedBackend(root);
+            }
+        }
+    }
+
+    private Set<Path> collectKnownManagedRoots(ChatglotConfig config) {
+        LinkedHashSet<Path> roots = new LinkedHashSet<>();
+        roots.add(LocalBackendPaths.resolveSharedRoot(config, configDir));
+        roots.add(ChatglotStoragePaths.resolveModConfigRoot(configDir).resolve("local-backend"));
+        roots.add(ChatglotStoragePaths.resolveLegacyLocalBackendRoot());
+        return roots;
+    }
+
+    private Text resolveRuntimeMessage(ChatglotConfig config, Path sharedRoot) {
+        if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
+            return LocalBackendTexts.runtimeMessage(Path.of(config.localBackendCommand.trim()).toString());
+        }
+
+        Path runtimePath = installer.resolveInstalledRuntime(config, sharedRoot);
+        if (installer.isRuntimeReady(config, sharedRoot)) {
+            return LocalBackendTexts.runtimeMessage(runtimePath.toString());
+        }
+        return LocalBackendTexts.runtimeNotReady(LocalBackendPaths.runtimeDir(sharedRoot).toString());
     }
 
     private static List<String> buildCommand(ChatglotConfig config, Path runtimePath, Path modelPath) {

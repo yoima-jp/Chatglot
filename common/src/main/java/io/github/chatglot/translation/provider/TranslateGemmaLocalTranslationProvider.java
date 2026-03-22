@@ -39,7 +39,7 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
         throws TranslationException {
         LocalBackendStatus status = backendManager.checkStatus(config);
         if (!status.healthy()) {
-            throw new TranslationException("Local backend unavailable: " + status.message());
+            throw new TranslationException("Local backend unavailable: " + status.message().getString());
         }
 
         JsonObject payload = new JsonObject();

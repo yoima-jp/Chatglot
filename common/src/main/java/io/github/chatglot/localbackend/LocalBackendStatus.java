@@ -1,13 +1,15 @@
 package io.github.chatglot.localbackend;
 
 import java.nio.file.Path;
+import net.minecraft.text.Text;
 
 public record LocalBackendStatus(
+    String code,
     boolean supported,
     boolean healthy,
     boolean running,
     String backendUrl,
     Path sharedRoot,
     String modelPath,
-    String message
+    Text message
 ) {}

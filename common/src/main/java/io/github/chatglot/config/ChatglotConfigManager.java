@@ -14,12 +14,14 @@ public final class ChatglotConfigManager {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
 
     private final Path path;
+    private final Path sharedPath;
     private ChatglotConfig config;
     private boolean createdNewConfigFile;
 
     public ChatglotConfigManager(Path configDir) {
-        Path modDir = configDir.resolve(ChatglotConstants.MOD_ID);
+        Path modDir = ChatglotStoragePaths.resolveModConfigRoot(configDir);
         this.path = modDir.resolve("chatglot.json");
+        this.sharedPath = ChatglotStoragePaths.resolveSharedSettingsFile();
         this.config = load();
     }
 
@@ -38,8 +40,23 @@ public final class ChatglotConfigManager {
     public synchronized void save() {
         config.sanitize();
         try {
+            ChatglotConfig effective = config.copy();
+            effective.sanitize();
+
             Files.createDirectories(path.getParent());
-            Files.writeString(path, GSON.toJson(config));
+            if (effective.useSharedAppDataSettings) {
+                ChatglotConfig primary = effective.copy();
+                primary.clearSharedSettings();
+                primary.sanitize();
+                Files.writeString(path, GSON.toJson(primary));
+
+                ChatglotConfig shared = effective.extractSharedSettings();
+                Files.createDirectories(sharedPath.getParent());
+                Files.writeString(sharedPath, GSON.toJson(shared));
+            } else {
+                Files.writeString(path, GSON.toJson(effective));
+            }
+            config = effective;
         } catch (IOException e) {
             LOGGER.error("Failed to save config: {}", path, e);
         }
@@ -56,9 +73,14 @@ public final class ChatglotConfigManager {
                 return defaults;
             }
 
-            ChatglotConfig loaded = GSON.fromJson(Files.readString(path), ChatglotConfig.class);
+            String raw = Files.readString(path);
+            ChatglotConfig loaded = GSON.fromJson(raw, ChatglotConfig.class);
             if (loaded == null) {
                 loaded = new ChatglotConfig();
+            }
+            boolean migratedLegacySharedPreference = migrateLegacySharedStoragePreference(raw, loaded);
+            if (loaded.useSharedAppDataSettings) {
+                loaded.applySharedSettingsFrom(loadSharedSettings(migratedLegacySharedPreference ? loaded : null));
             }
             loaded.sanitize();
             createdNewConfigFile = false;
@@ -70,5 +92,36 @@ public final class ChatglotConfigManager {
             createdNewConfigFile = false;
             return defaults;
         }
+    }
+
+    private ChatglotConfig loadSharedSettings(ChatglotConfig fallback) {
+        try {
+            Files.createDirectories(sharedPath.getParent());
+            if (!Files.exists(sharedPath)) {
+                return fallback != null ? fallback.extractSharedSettings() : new ChatglotConfig();
+            }
+
+            ChatglotConfig shared = GSON.fromJson(Files.readString(sharedPath), ChatglotConfig.class);
+            if (shared == null) {
+                shared = fallback != null ? fallback.extractSharedSettings() : new ChatglotConfig();
+            }
+            shared.sanitize();
+            return shared;
+        } catch (Exception e) {
+            LOGGER.warn("Failed to load shared Chatglot settings: {}", sharedPath, e);
+            return fallback != null ? fallback.extractSharedSettings() : new ChatglotConfig();
+        }
+    }
+
+    private boolean migrateLegacySharedStoragePreference(String raw, ChatglotConfig loaded) {
+        if (raw != null && raw.contains("\"useSharedAppDataSettings\"")) {
+            return false;
+        }
+
+        if (ChatglotStoragePaths.hasLegacyLocalBackendInstall()) {
+            loaded.useSharedAppDataSettings = true;
+            return true;
+        }
+        return false;
     }
 }

@@ -1,133 +1,134 @@
 # Chatglot
+![Chat translation examples](https://cdn.modrinth.com/data/cached_images/7225369d145f4b9bd970aa38485f37cbfe4782c3.png)
+**Chatglot** is a Fabric client-side mod that translates Minecraft chat messages on the fly.  
+A translate button (`✍` by default) is added to each chat message. Click it, or let auto-translate handle it, and the translated result is shown in chat either as a new line or by replacing the original message.
 
-Chatglot は Minecraft チャットを翻訳する Fabric クライアント MOD です。  
-`common + fabric` のマルチモジュール構成で、複数の翻訳プロバイダを切り替えて利用できます。
+Client-side only. No server installation is required.
 
-## 主な機能
+---
 
-- チャット末尾に翻訳ボタンを付与（既定ラベル: `✍`）
-- ボタンクリックまたはコマンドで個別翻訳
-- 自動翻訳（Lingua による言語判定）
-- 翻訳結果を新規行表示、または原文チャットを置換
-- プロバイダ切り替え  
-  `default` / `gas` / `deepl` / `google` / `codex` / `translategemma_local` / `openai` / `gemini` / `anthropic` / `azure`
-- Cloth Config + ModMenu でゲーム内設定
-- `F8` キーで設定画面を直接オープン
+## Features
 
-## 対応バージョン
+- Translate button appended to every chat message (configurable label)
+- Click-to-translate or automatic translation
+- Result shown as a new line **or** replaces the original chat message
+- Open the settings screen with `F8` or `/chatglot config`
+- Translate a specific message with `/chatglot translate <id>`
+![Config GUI](https://cdn.modrinth.com/data/cached_images/166cb33a9ad36001e34402412d0574044f5cdefd.jpeg)
+---
 
-- Minecraft: `1.21.x`（現在のプロファイル既定は `1.21.11`）
-- Java: `21`
+## Translation Providers
 
-`version-profiles/` で以下の切り替えを用意しています。
+Chatglot supports multiple translation backends. Switch between them in the settings screen.
 
-- `fabric-1.21.11.properties`
+| Provider | Requires |
+|---|---|
+| `default` | Nothing. Uses an author-operated free GAS endpoint. Rate-limited, and auto-translate is unavailable. |
+| `gas` | Your own Google Apps Script web app URL |
+| `deepl` | DeepL API key |
+| `google` | Google Cloud Translation API key |
+| `openai` | OpenAI API key |
+| `gemini` | Gemini API key |
+| `anthropic` | Anthropic API key |
+| `azure` | Azure Translator API key + region |
+| `codex` | Browser OAuth (one-time, token stored locally) |
+| `translategemma_local` | Windows only. Downloads `llama.cpp` + a TranslateGemma GGUF model, then runs a local backend over `localhost` |
 
-```powershell
-./scripts/use-version-profile.ps1 -ProfileName fabric-1.21.11
-```
+---
 
-## 開発コマンド
+## Recommended Providers
 
-```powershell
-./gradlew.bat :fabric:build
-./gradlew.bat :fabric:runClient
-```
+- **`GAS`**: Good if you want a free setup with your own Google account. Google Apps Script documents up to `5,000` Translate calls per day for consumer accounts, though quotas can change. See [Apps Script quotas](https://developers.google.com/apps-script/guides/services/quotas).
+- **`TranslateGemma`**: A strong option if your PC has enough headroom for local inference. After setup, it runs locally over `localhost`, can be fast, and does not require a paid API for each request. It does require downloading the `llama.cpp` runtime and a TranslateGemma GGUF model.
+- **`Codex`**: Recommended if you already subscribe to ChatGPT. OpenAI states that Codex is included with ChatGPT Plus, Pro, Business, Edu, and Enterprise plans, with plan-based limits. See [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan).
+- **`Azure`**: A good option if you want an official API with a free tier. Azure Translator `F0` includes `2 million` characters free per month according to Microsoft's pricing page. See [Azure Translator pricing](https://azure.microsoft.com/pricing/details/cognitive-services/translator/).
 
-macOS / Linux の場合:
+---
 
-```bash
-./gradlew :fabric:build
-./gradlew :fabric:runClient
-```
+## Requirements
 
-## 操作方法
+- Minecraft `1.21.11`
+- [Fabric Loader](https://fabricmc.net/)
+- [Fabric API](https://modrinth.com/mod/fabric-api)
+- [Cloth Config](https://modrinth.com/mod/cloth-config) *(required for in-game settings)*
+- [ModMenu](https://modrinth.com/mod/modmenu) *(optional, recommended)*
 
-- チャットメッセージ末尾の `✍`（既定）をクリックして翻訳
-- `/chatglot translate <id>` で指定IDのメッセージを翻訳
-- `/chatglot config` で設定画面を開く
-- `/chatglot save` で設定を保存
-- `F8` で設定画面を開く（既定キー）
+---
 
-翻訳メッセージは `【翻訳】➡` プレフィックスで表示されます。
+## Configuration
 
-## 設定ファイル
+The config file is located at `config/chatglot/chatglot.json`.
 
-- パス: `config/chatglot/chatglot.json`
+Key settings:
 
-主要設定:
+- `enabled` — Enable or disable the mod entirely
+- `autoTranslateEnabled` — Toggle automatic translation
+- `targetLanguage` — e.g. `JA`, `EN`, `EN-US`, `ZH-HANS` (defaults to your Minecraft language)
+- `provider` — Choose your translation backend
+- `overwriteOriginalWithTranslation` — Replace original message instead of adding a new line
+- `appendTranslateButton` — Show or hide the `✍` button
+- `translateButtonLabel` — Customize the button label
+- `showTranslationPrefix` — Show or hide the translated-message prefix
+- `requestTimeoutSeconds` — Network timeout (`5`-`240` seconds)
+- `maxConcurrentTranslations` — Max parallel translation requests (`1`-`16`)
+- `useSharedAppDataSettings` — Share API keys, model settings, and local backend settings through `%LOCALAPPDATA%`
 
-- `enabled`: MOD全体の有効/無効
-- `appendTranslateButton`: 翻訳ボタンをチャットへ追加
-- `translateButtonLabel`: ボタンラベル（既定 `✍`）
-- `autoTranslateEnabled`: 自動翻訳の有効/無効
-- `overwriteOriginalWithTranslation`: 原文置換モード
-- `showTranslationPrefix`: `【翻訳】➡` プレフィックスの表示/非表示
-- `targetLanguage`: 例 `JA`, `EN`, `EN-US`, `ZH-HANS`  
-  初回生成時は `MINECRAFT_DEFAULT`（Minecraft 言語に追従）
-- `provider`: `default|gas|deepl|google|codex|openai|gemini|anthropic|azure|translategemma_local`
-- `requestTimeoutSeconds`: 通信タイムアウト秒（5〜240）
-- `maxConcurrentTranslations`: 同時に進める翻訳数の上限（1〜16）
+---
 
-プロバイダ固有設定:
+## TranslateGemma Local Backend
 
-- `deeplApiKey`, `deeplUseFreeApi`
-- `googleTranslateApiKey`
-- `gasWebAppUrl`
-- `codexTokenFile`, `codexModel`, `codexReasoningEffort`, `codexReasoningSummary`
-- `openaiApiKey`, `openaiModel`
-- `geminiApiKey`, `geminiModel`
-- `anthropicApiKey`, `anthropicModel`
-- `azureTranslatorApiKey`, `azureTranslatorRegion`, `azureTranslatorEndpoint`
-- `localBackendBaseUrl`, `localBackendPort`, `localBackendSharedDirectory`, `localBackendCommand`
-- `localModelPath`, `localModelAlias`, `localModelFileName`, `localModelDownloadUrl`
+`translategemma_local` is a Windows-only local translation option. It does not run inference inside the Minecraft JVM. Instead, it uses a separate local backend process over `127.0.0.1` / `localhost`.
 
-## プロバイダ補足
+When you use the TranslateGemma setup buttons in the config screen, Chatglot:
 
-- `default` は内蔵の無料 GAS エンドポイントを使用します（レート制限あり）。
-- `default` 選択時は自動翻訳は利用できません。
-- `gas` は自分でデプロイした GAS Web アプリ URL（`.../exec`）を使用します。
-- `codex` は初回利用時にブラウザ OAuth を行い、`http://localhost:1455/auth/callback` で認証を受け取ります。
-- モデル一覧は設定画面から更新可能です（Codex / OpenAI / Gemini / Anthropic）。
-- `default` が混雑しているときは `gas` を自分で設定するか、PC スペックに余裕があれば `translategemma_local` を使うと高速・無料・実質無制限で使えます。
-- `translategemma_local` は **外部ローカルバックエンドプロセス** を localhost HTTP で利用するローカルモデル機能です（Minecraft JVM 内では推論しません）。
-- 設定画面では先に `Setup and start TranslateGemma`、その後に `Download / repair model` を実行してください。セットアップは `winget` で `llama.cpp` を導入し、既定の GGUF モデルをダウンロードして `llama-server` を起動します。
-- 既定モデルは `mradermacher/translategemma-4b-it-GGUF` の `translategemma-4b-it.Q4_K_M.gguf` を利用します。必要に応じて設定から URL やファイル名を上書きできます。
-- 共有ディレクトリは既定で `%LOCALAPPDATA%\ChatglotLocal\` です。`runtime/`, `models/`, `data/`, `logs/`, `state.json` を作成し、ログは `logs/backend.log` に保存します。
-- `localModelPath` と `localBackendCommand` を設定すると、既存のローカルモデルや独自ランタイムを優先して利用できます。
+- Downloads a prebuilt `llama.cpp` Windows runtime
+- Downloads a TranslateGemma GGUF model file
+- Starts `llama-server.exe` locally and sends translation requests to that local server
 
-## GAS 連携手順
+The default model is `mradermacher/translategemma-4b-it-GGUF` using `translategemma-4b-it.Q4_K_M.gguf`.
 
-1. 設定画面の `Google Apps Script (GAS)` で `GASコードをコピー`
-2. `Apps Scriptを開く` で Google Apps Script を開く
-3. 新規プロジェクトへコードを貼り付けて保存
-4. `デプロイ` -> `新しいデプロイ` -> `ウェブアプリ`
-5. 実行ユーザーを `自分`、アクセスを `全員`（または用途に応じて）でデプロイ
-6. 発行URL（`.../exec`）を `GAS WebアプリURL` に設定
-7. `provider` を `gas` に切り替えて利用
+By default, Chatglot stores the local backend runtime, model, logs, and state inside:
 
-## キャッシュ/トークンファイル
+- `config/chatglot/local-backend/` when shared AppData settings are disabled
+- `%LOCALAPPDATA%/ChatglotLocal/` when shared AppData settings are enabled
 
-`config/chatglot/` 配下に以下が作成されます（利用状況に応じて）。
+You can also override the runtime path, model path, download URL, or shared directory from the config screen.
 
-- `chatglot.json`（設定）
-- `codex_tokens.json`（Codex OAuth トークン、`codexTokenFile` 未指定時）
-- `codex_models.json`
-- `openai_models.json`
-- `gemini_models.json`
-- `anthropic_models.json`
+---
 
-## プロジェクト構成
+## Shared Settings Storage
 
-```text
-common/  : ローダー共通の翻訳ロジック・設定・Mixin
-fabric/  : Fabricエントリポイント、クライアントコマンド、設定UI
-```
+If `useSharedAppDataSettings` is enabled, Chatglot stores shared settings in `%LOCALAPPDATA%` so multiple launch profiles can reuse them.
 
-## ライセンス
+This may include:
 
-`MIT`
+- API keys for supported translation providers
+- Codex token file location and related model settings
+- TranslateGemma local backend settings such as runtime path, model path, port, and shared directory
 
-## 製作者
+Shared settings are stored locally on your PC. They are not uploaded anywhere just because this option is enabled.
 
-`yoima`
+---
+
+## Privacy Notice — External Data Transmission
+
+**This mod sends chat text to external translation services.** The destination depends on the provider you select.
+
+- **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
+- **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
+- **`openai` provider**: Chat text is sent to the OpenAI API using your API key. See [OpenAI data controls](https://platform.openai.com/docs/guides/your-data/).
+- **`codex` provider**: Uses browser-based OAuth, stores the token locally, and then uses that token to send chat text to OpenAI services. The mod also fetches the available model list from [`https://modelapi.yoima.com/api/codex-models/list`](https://modelapi.yoima.com/api/codex-models/list). No chat content is sent to that model-list endpoint.
+- **`gemini` provider**: Chat text is sent to the Gemini API. For Google AI Studio / Gemini API usage, review the provider terms here: [Gemini API Terms](https://ai.google.dev/gemini-api/terms).
+- **`deepl` provider**: Chat text is sent to the DeepL API. See [DeepL Privacy Policy](https://www.deepl.com/en/privacy.html).
+- **`anthropic` provider**: Chat text is sent to Anthropic services using your API key. See [Anthropic Privacy Policy](https://www.anthropic.com/legal/privacy).
+- **`azure` provider**: Chat text is sent to Azure Translator using your API key. See [Data, privacy, and security for Azure Translator](https://learn.microsoft.com/en-us/legal/cognitive-services/translator/data-privacy-security).
+- **`google` provider**: Chat text is sent to Google Cloud Translation using your API key. See [Google Cloud Privacy Notice](https://cloud.google.com/terms/cloud-privacy-notice).
+- **`translategemma_local` provider**: Chat text is sent only to a local backend running on `127.0.0.1` / `localhost`. During setup, this mod downloads the `llama.cpp` runtime and the TranslateGemma GGUF model from a third-party hosting source configured by the mod.
+
+---
+
+
+## Source & License
+
+Source code: [GitHub — yoima-jp/Chatglot](https://github.com/yoima-jp/Chatglot)  
+License: MIT

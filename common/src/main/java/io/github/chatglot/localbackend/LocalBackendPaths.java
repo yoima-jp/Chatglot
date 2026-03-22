@@ -1,29 +1,31 @@
 package io.github.chatglot.localbackend;
 
 import io.github.chatglot.config.ChatglotConfig;
+import io.github.chatglot.config.ChatglotStoragePaths;
 import java.nio.file.Path;
 
 public final class LocalBackendPaths {
-    private static final String DEFAULT_ROOT_NAME = "ChatglotLocal";
-
     private LocalBackendPaths() {
     }
 
-    public static Path resolveSharedRoot(String configuredRoot) {
+    public static Path resolveSharedRoot(ChatglotConfig config, Path configDir) {
+        return resolveSharedRoot(config, configDir, config.localBackendSharedDirectory);
+    }
+
+    public static Path resolveSharedRoot(ChatglotConfig config, Path configDir, String configuredRoot) {
         if (configuredRoot != null && !configuredRoot.isBlank()) {
             return Path.of(configuredRoot.trim());
         }
 
-        String localAppData = System.getenv("LOCALAPPDATA");
-        if (localAppData != null && !localAppData.isBlank()) {
-            return Path.of(localAppData).resolve(DEFAULT_ROOT_NAME);
-        }
-
-        return Path.of(System.getProperty("user.home", ".")).resolve("AppData").resolve("Local").resolve(DEFAULT_ROOT_NAME);
+        return ChatglotStoragePaths.resolveDefaultLocalBackendRoot(config, configDir);
     }
 
     public static Path runtimeDir(Path root) {
         return root.resolve("runtime");
+    }
+
+    public static Path runtimeExecutable(Path root) {
+        return runtimeDir(root).resolve("llama-server.exe");
     }
 
     public static Path modelsDir(Path root) {
@@ -53,19 +55,4 @@ public final class LocalBackendPaths {
         return modelsDir(root).resolve(config.localModelFileName == null || config.localModelFileName.isBlank() ? ChatglotConfig.LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME : config.localModelFileName.trim());
     }
 
-    public static Path wingetLinksDir() {
-        String localAppData = System.getenv("LOCALAPPDATA");
-        if (localAppData != null && !localAppData.isBlank()) {
-            return Path.of(localAppData).resolve("Microsoft").resolve("WinGet").resolve("Links");
-        }
-        return Path.of(System.getProperty("user.home", ".")).resolve("AppData").resolve("Local").resolve("Microsoft").resolve("WinGet").resolve("Links");
-    }
-
-    public static Path wingetPackagesDir() {
-        String localAppData = System.getenv("LOCALAPPDATA");
-        if (localAppData != null && !localAppData.isBlank()) {
-            return Path.of(localAppData).resolve("Microsoft").resolve("WinGet").resolve("Packages");
-        }
-        return Path.of(System.getProperty("user.home", ".")).resolve("AppData").resolve("Local").resolve("Microsoft").resolve("WinGet").resolve("Packages");
-    }
 }

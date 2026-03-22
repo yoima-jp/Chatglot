@@ -37,6 +37,7 @@ public class ChatglotConfig {
     public boolean showSourceLanguageTag = true;
 
     public String provider = DEFAULT_PROVIDER;
+    public boolean useSharedAppDataSettings = false;
 
     public String deeplApiKey = "";
     public boolean deeplUseFreeApi = true;
@@ -72,6 +73,117 @@ public class ChatglotConfig {
 
     public int requestTimeoutSeconds = 45;
     public int maxConcurrentTranslations = 1;
+
+    public ChatglotConfig copy() {
+        ChatglotConfig copy = new ChatglotConfig();
+        copy.enabled = enabled;
+        copy.appendTranslateButton = appendTranslateButton;
+        copy.translateButtonLabel = translateButtonLabel;
+        copy.autoTranslateEnabled = autoTranslateEnabled;
+        copy.autoTranslateEnabledWhenSupported = autoTranslateEnabledWhenSupported;
+        copy.overwriteOriginalWithTranslation = overwriteOriginalWithTranslation;
+        copy.showTranslationPrefix = showTranslationPrefix;
+        copy.preserveLeadingSpeakerPrefix = preserveLeadingSpeakerPrefix;
+        copy.targetLanguage = targetLanguage;
+        copy.showSourceLanguageTag = showSourceLanguageTag;
+        copy.provider = provider;
+        copy.useSharedAppDataSettings = useSharedAppDataSettings;
+        copy.deeplApiKey = deeplApiKey;
+        copy.deeplUseFreeApi = deeplUseFreeApi;
+        copy.googleTranslateApiKey = googleTranslateApiKey;
+        copy.gasWebAppUrl = gasWebAppUrl;
+        copy.codexTokenFile = codexTokenFile;
+        copy.codexModel = codexModel;
+        copy.codexReasoningEffort = codexReasoningEffort;
+        copy.codexReasoningSummary = codexReasoningSummary;
+        copy.openaiApiKey = openaiApiKey;
+        copy.openaiModel = openaiModel;
+        copy.geminiApiKey = geminiApiKey;
+        copy.geminiModel = geminiModel;
+        copy.anthropicApiKey = anthropicApiKey;
+        copy.anthropicModel = anthropicModel;
+        copy.azureTranslatorApiKey = azureTranslatorApiKey;
+        copy.azureTranslatorRegion = azureTranslatorRegion;
+        copy.azureTranslatorEndpoint = azureTranslatorEndpoint;
+        copy.localBackendBaseUrl = localBackendBaseUrl;
+        copy.localBackendPort = localBackendPort;
+        copy.localBackendSharedDirectory = localBackendSharedDirectory;
+        copy.localBackendCommand = localBackendCommand;
+        copy.localModelPath = localModelPath;
+        copy.localModelAlias = localModelAlias;
+        copy.localModelFileName = localModelFileName;
+        copy.localModelDownloadUrl = localModelDownloadUrl;
+        copy.requestTimeoutSeconds = requestTimeoutSeconds;
+        copy.maxConcurrentTranslations = maxConcurrentTranslations;
+        return copy;
+    }
+
+    public void applySharedSettingsFrom(ChatglotConfig other) {
+        if (other == null) {
+            return;
+        }
+
+        deeplApiKey = other.deeplApiKey;
+        deeplUseFreeApi = other.deeplUseFreeApi;
+        googleTranslateApiKey = other.googleTranslateApiKey;
+        gasWebAppUrl = other.gasWebAppUrl;
+        codexTokenFile = other.codexTokenFile;
+        codexModel = other.codexModel;
+        codexReasoningEffort = other.codexReasoningEffort;
+        codexReasoningSummary = other.codexReasoningSummary;
+        openaiApiKey = other.openaiApiKey;
+        openaiModel = other.openaiModel;
+        geminiApiKey = other.geminiApiKey;
+        geminiModel = other.geminiModel;
+        anthropicApiKey = other.anthropicApiKey;
+        anthropicModel = other.anthropicModel;
+        azureTranslatorApiKey = other.azureTranslatorApiKey;
+        azureTranslatorRegion = other.azureTranslatorRegion;
+        azureTranslatorEndpoint = other.azureTranslatorEndpoint;
+        localBackendBaseUrl = other.localBackendBaseUrl;
+        localBackendPort = other.localBackendPort;
+        localBackendSharedDirectory = other.localBackendSharedDirectory;
+        localBackendCommand = other.localBackendCommand;
+        localModelPath = other.localModelPath;
+        localModelAlias = other.localModelAlias;
+        localModelFileName = other.localModelFileName;
+        localModelDownloadUrl = other.localModelDownloadUrl;
+    }
+
+    public ChatglotConfig extractSharedSettings() {
+        ChatglotConfig copy = new ChatglotConfig();
+        copy.applySharedSettingsFrom(this);
+        copy.sanitize();
+        return copy;
+    }
+
+    public void clearSharedSettings() {
+        deeplApiKey = "";
+        deeplUseFreeApi = true;
+        googleTranslateApiKey = "";
+        gasWebAppUrl = "";
+        codexTokenFile = "";
+        codexModel = CODEX_DEFAULT_MODEL;
+        codexReasoningEffort = CODEX_REASONING_EFFORT_MEDIUM;
+        codexReasoningSummary = "auto";
+        openaiApiKey = "";
+        openaiModel = OPENAI_DEFAULT_MODEL;
+        geminiApiKey = "";
+        geminiModel = GEMINI_DEFAULT_MODEL;
+        anthropicApiKey = "";
+        anthropicModel = ANTHROPIC_DEFAULT_MODEL;
+        azureTranslatorApiKey = "";
+        azureTranslatorRegion = "";
+        azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
+        localBackendBaseUrl = "";
+        localBackendPort = LOCAL_BACKEND_DEFAULT_PORT;
+        localBackendSharedDirectory = "";
+        localBackendCommand = "";
+        localModelPath = "";
+        localModelAlias = LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
+        localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
+        localModelDownloadUrl = LOCAL_BACKEND_DEFAULT_MODEL_URL;
+    }
 
     public static String normalizeCodexReasoningEffort(String effort) {
         if (effort == null || effort.isBlank()) {

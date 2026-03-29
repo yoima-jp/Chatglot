@@ -16,6 +16,7 @@ public final class ChatglotConfigManager {
     private final Path path;
     private final Path sharedPath;
     private ChatglotConfig config;
+    private ChatglotConfig persistedConfig;
     private boolean createdNewConfigFile;
 
     public ChatglotConfigManager(Path configDir) {
@@ -23,6 +24,7 @@ public final class ChatglotConfigManager {
         this.path = modDir.resolve("chatglot.json");
         this.sharedPath = ChatglotStoragePaths.resolveSharedSettingsFile();
         this.config = load();
+        this.persistedConfig = this.config.copy();
     }
 
     public synchronized ChatglotConfig get() {
@@ -31,6 +33,7 @@ public final class ChatglotConfigManager {
 
     public synchronized void reload() {
         this.config = load();
+        this.persistedConfig = this.config.copy();
     }
 
     public synchronized boolean createdNewConfigFile() {
@@ -42,21 +45,33 @@ public final class ChatglotConfigManager {
         try {
             ChatglotConfig effective = config.copy();
             effective.sanitize();
+            boolean wasUsingSharedSettings = persistedConfig != null && persistedConfig.useSharedAppDataSettings;
+            boolean sharedModeChanged = persistedConfig == null || wasUsingSharedSettings != effective.useSharedAppDataSettings;
 
             Files.createDirectories(path.getParent());
             if (effective.useSharedAppDataSettings) {
+                boolean switchedToSharedSettings = sharedModeChanged && !wasUsingSharedSettings;
+                boolean preserveExistingSharedSettings = switchedToSharedSettings && Files.exists(sharedPath);
+                if (preserveExistingSharedSettings) {
+                    effective.applySharedSettingsFrom(loadSharedSettings(effective));
+                    effective.sanitize();
+                }
+
                 ChatglotConfig primary = effective.copy();
                 primary.clearSharedSettings();
                 primary.sanitize();
                 Files.writeString(path, GSON.toJson(primary));
 
-                ChatglotConfig shared = effective.extractSharedSettings();
-                Files.createDirectories(sharedPath.getParent());
-                Files.writeString(sharedPath, GSON.toJson(shared));
+                if (!preserveExistingSharedSettings) {
+                    ChatglotConfig shared = effective.extractSharedSettings();
+                    Files.createDirectories(sharedPath.getParent());
+                    Files.writeString(sharedPath, GSON.toJson(shared));
+                }
             } else {
                 Files.writeString(path, GSON.toJson(effective));
             }
             config = effective;
+            persistedConfig = effective.copy();
         } catch (IOException e) {
             LOGGER.error("Failed to save config: {}", path, e);
         }

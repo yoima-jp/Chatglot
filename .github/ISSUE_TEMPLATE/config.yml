@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Chatglot on Modrinth
+    url: https://modrinth.com/project/chatglot/
+    about: Check releases and project information.
+  - name: Chatglot source code
+    url: https://github.com/yoima-jp/Chatglot
+    about: Browse the source code and existing issues.

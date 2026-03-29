@@ -8,7 +8,7 @@ public class ChatglotConfig {
     public static final String DEFAULT_PROVIDER = "default";
     public static final String GAS_DEFAULT_WEB_APP_URL =
         "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
-    public static final String CODEX_DEFAULT_MODEL = "gpt-5.3-codex";
+    public static final String CODEX_DEFAULT_MODEL = "gpt-5.4-mini";
     public static final String OPENAI_DEFAULT_MODEL = "gpt-5-nano";
     public static final String GEMINI_DEFAULT_MODEL = "gemini-flash-latest";
     public static final String ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
@@ -46,7 +46,7 @@ public class ChatglotConfig {
 
     public String codexTokenFile = "";
     public String codexModel = CODEX_DEFAULT_MODEL;
-    public String codexReasoningEffort = "medium";
+    public String codexReasoningEffort = CODEX_REASONING_EFFORT_LOW;
     public String codexReasoningSummary = "auto";
 
     public String openaiApiKey = "";
@@ -178,7 +178,7 @@ public class ChatglotConfig {
 
     public static String normalizeCodexReasoningEffort(String effort) {
         if (effort == null || effort.isBlank()) {
-            return CODEX_REASONING_EFFORT_MEDIUM;
+            return CODEX_REASONING_EFFORT_LOW;
         }
 
         return switch (effort.trim().toLowerCase(Locale.ROOT)) {
@@ -186,7 +186,7 @@ public class ChatglotConfig {
             case CODEX_REASONING_EFFORT_MEDIUM -> CODEX_REASONING_EFFORT_MEDIUM;
             case CODEX_REASONING_EFFORT_HIGH -> CODEX_REASONING_EFFORT_HIGH;
             case CODEX_REASONING_EFFORT_EXTRA_HIGH, "extra high", "extra_high", "extra-high", "extrahigh" -> CODEX_REASONING_EFFORT_EXTRA_HIGH;
-            default -> CODEX_REASONING_EFFORT_MEDIUM;
+            default -> CODEX_REASONING_EFFORT_LOW;
         };
     }
 
@@ -222,7 +222,7 @@ public class ChatglotConfig {
         codexModel = codexModel.trim();
 
         if (codexReasoningEffort == null || codexReasoningEffort.isBlank()) {
-            codexReasoningEffort = "medium";
+            codexReasoningEffort = CODEX_REASONING_EFFORT_LOW;
         }
         codexReasoningEffort = normalizeCodexReasoningEffort(codexReasoningEffort);
 

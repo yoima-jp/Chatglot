@@ -35,6 +35,7 @@ public final class ChatglotConfigScreenFactory {
     private static final String ANTHROPIC_API_KEYS_URL = "https://console.anthropic.com/settings/keys";
     private static final String AZURE_TRANSLATOR_API_KEYS_URL = "https://portal.azure.com";
     private static final String GAS_APPS_SCRIPT_HOME_URL = "https://script.google.com/home/?hl=ja&pli=1";
+    private static final String GITHUB_ISSUES_URL = "https://github.com/yoima-jp/Chatglot/issues/new/choose";
     private static final String GAS_SCRIPT_TEMPLATE = """
 function doGet(e) {
   return handleRequest(e, "GET");
@@ -379,6 +380,7 @@ function jsonResponse(obj) {
         builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.openai"));
         builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.gemini"));
         builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.anthropic"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.support"));
 
         ConfigCategory deepL = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.deepl"));
         deepL.addEntry(
@@ -482,7 +484,7 @@ function jsonResponse(obj) {
                     CodexReasoningOption.class,
                     codexReasoningOption
                 )
-                .setDefaultValue(CodexReasoningOption.MEDIUM)
+                .setDefaultValue(CodexReasoningOption.LOW)
                 .setEnumNameProvider(
                     option -> Component.translatable("chatglot.config.codex_effort." + option.name().toLowerCase(Locale.ROOT))
                 )
@@ -724,6 +726,15 @@ function jsonResponse(obj) {
                 .setDefaultValue(ChatglotConfig.AZURE_TRANSLATOR_DEFAULT_ENDPOINT)
                 .setSaveConsumer(value -> config.azureTranslatorEndpoint = value)
                 .build()
+        );
+
+        ConfigCategory support = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.support"));
+        support.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.support.issue_notice")).build());
+        support.addEntry(
+            new CodexAuthButtonEntry(
+                Component.translatable("chatglot.config.support.report_issue"),
+                () -> Util.getPlatform().openUri(GITHUB_ISSUES_URL)
+            )
         );
 
         return builder.build();

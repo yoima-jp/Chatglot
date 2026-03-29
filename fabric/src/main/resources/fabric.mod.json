@@ -9,7 +9,9 @@
   ],
   "icon": "assets/chatglot/icon.png",
   "contact": {
-    "homepage": "https://modrinth.com/project/chatglot/"
+    "homepage": "https://modrinth.com/project/chatglot/",
+    "sources": "https://github.com/yoima-jp/Chatglot",
+    "issues": "https://github.com/yoima-jp/Chatglot/issues/new/choose"
   },
   "license": "MIT",
   "environment": "client",

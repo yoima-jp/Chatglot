@@ -1,17 +1,17 @@
 package io.github.chatglot.mixin;
 
 import java.util.List;
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.client.gui.hud.ChatHudLine;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 
-@Mixin(ChatHud.class)
+@Mixin(ChatComponent.class)
 public interface ChatHudAccessor {
-    @Accessor("messages")
-    List<ChatHudLine> chatglot$getMessages();
+    @Accessor("allMessages")
+    List<GuiMessage> chatglot$getMessages();
 
-    @Invoker("refresh")
+    @Invoker("refreshTrimmedMessages")
     void chatglot$invokeRefresh();
 }

@@ -1,7 +1,7 @@
 package io.github.chatglot.fabric.mixin;
 
 import me.shedaniel.clothconfig2.gui.entries.DropdownBoxEntry;
-import net.minecraft.client.gui.Click;
+import net.minecraft.client.input.MouseButtonEvent;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -10,13 +10,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 @Mixin(targets = "me.shedaniel.clothconfig2.gui.ClothConfigScreen$ListWidget", remap = false)
 public abstract class ClothConfigScreenMixin {
     @Inject(
-        method = "mouseClicked(Lnet/minecraft/client/gui/Click;Z)Z",
+        method = "mouseClicked(Lnet/minecraft/client/input/MouseButtonEvent;Z)Z",
         at = @At("HEAD"),
         remap = false,
         require = 0
     )
     private void chatglot$closeDropdownOnOutsideClick(
-        Click click,
+        MouseButtonEvent click,
         boolean focused,
         CallbackInfoReturnable<Boolean> cir
     ) {

@@ -19,10 +19,10 @@ import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
 import me.shedaniel.clothconfig2.impl.builders.DropdownMenuBuilder;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.resource.language.LanguageDefinition;
-import net.minecraft.text.Text;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.resources.language.LanguageInfo;
+import net.minecraft.network.chat.Component;
 import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,7 +104,7 @@ function jsonResponse(obj) {
 }
     """;
     private static final Logger LOGGER = LoggerFactory.getLogger(ChatglotConfigScreenFactory.class);
-    private static volatile Text localBackendStatusMessage = Text.empty();
+    private static volatile Component localBackendStatusMessage = Component.empty();
 
     private enum ProviderOption {
         DEFAULT("default"),
@@ -184,7 +184,7 @@ function jsonResponse(obj) {
     public static Screen create(Screen parent) {
         ChatglotRuntime runtime = ChatglotRuntime.get();
         ChatglotConfig config = runtime.configManager().get();
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
 
         List<MinecraftLanguageOption> languageOptions = collectLanguageOptions(client);
         MinecraftLanguageOption currentLanguageOption = resolveCurrentLanguageOption(client, languageOptions);
@@ -247,7 +247,7 @@ function jsonResponse(obj) {
 
         ConfigBuilder builder = ConfigBuilder.create()
             .setParentScreen(parent)
-            .setTitle(Text.translatable("chatglot.config.title"));
+            .setTitle(Component.translatable("chatglot.config.title"));
 
         builder.setSavingRunnable(() -> {
             config.sanitize();
@@ -257,18 +257,18 @@ function jsonResponse(obj) {
 
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
 
-        ConfigCategory general = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.general"));
+        ConfigCategory general = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.general"));
         ProviderOption providerOption = ProviderOption.fromConfigValue(config.provider);
         general.addEntry(
-            entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.enabled"), config.enabled)
+            entryBuilder.startBooleanToggle(Component.translatable("chatglot.config.enabled"), config.enabled)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.enabled = value)
                 .build()
         );
         general.addEntry(
-            entryBuilder.startEnumSelector(Text.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
+            entryBuilder.startEnumSelector(Component.translatable("chatglot.config.provider"), ProviderOption.class, providerOption)
                 .setDefaultValue(ProviderOption.DEFAULT)
-                .setEnumNameProvider(option -> Text.translatable("chatglot.config.provider." + option.name().toLowerCase(Locale.ROOT)))
+                .setEnumNameProvider(option -> Component.translatable("chatglot.config.provider." + option.name().toLowerCase(Locale.ROOT)))
                 .setSaveConsumer(value -> {
                     config.provider = value.id();
                     if (value == ProviderOption.DEFAULT) {
@@ -280,15 +280,15 @@ function jsonResponse(obj) {
                 })
                 .build()
         );
-        general.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.provider_notice")).build());
+        general.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.provider_notice")).build());
         general.addEntry(
             entryBuilder
                 .startDropdownMenu(
-                    Text.translatable("chatglot.config.target_language"),
+                    Component.translatable("chatglot.config.target_language"),
                     selectedLanguageOption,
                     value -> resolveLanguageOptionFromInput(value, selectableLanguageOptions, selectedLanguageOption),
-                    value -> Text.literal(value.label()),
-                    DropdownMenuBuilder.CellCreatorBuilder.of(value -> Text.literal(value.label()))
+                    value -> Component.literal(value.label()),
+                    DropdownMenuBuilder.CellCreatorBuilder.of(value -> Component.literal(value.label()))
                 )
                 .setSelections(selectableLanguageOptions)
                 .setDefaultValue(defaultLanguageOption)
@@ -297,19 +297,19 @@ function jsonResponse(obj) {
                 .build()
         );
         general.addEntry(
-            entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.append_button"), config.appendTranslateButton)
+            entryBuilder.startBooleanToggle(Component.translatable("chatglot.config.append_button"), config.appendTranslateButton)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.appendTranslateButton = value)
                 .build()
         );
         general.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.button_label"), config.translateButtonLabel)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.button_label"), config.translateButtonLabel)
                 .setDefaultValue(ChatglotConfig.DEFAULT_TRANSLATE_BUTTON_LABEL)
                 .setSaveConsumer(value -> config.translateButtonLabel = value)
                 .build()
         );
         general.addEntry(
-            entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.auto_translate"), config.autoTranslateEnabled)
+            entryBuilder.startBooleanToggle(Component.translatable("chatglot.config.auto_translate"), config.autoTranslateEnabled)
                 .setDefaultValue(false)
                 .setSaveConsumer(value -> {
                     ProviderOption currentProvider = ProviderOption.fromConfigValue(config.provider);
@@ -321,7 +321,7 @@ function jsonResponse(obj) {
         general.addEntry(
             entryBuilder
                 .startBooleanToggle(
-                    Text.translatable("chatglot.config.overwrite_translation"),
+                    Component.translatable("chatglot.config.overwrite_translation"),
                     config.overwriteOriginalWithTranslation
                 )
                 .setDefaultValue(false)
@@ -330,7 +330,7 @@ function jsonResponse(obj) {
         );
         general.addEntry(
             entryBuilder
-                .startBooleanToggle(Text.translatable("chatglot.config.show_translation_prefix"), config.showTranslationPrefix)
+                .startBooleanToggle(Component.translatable("chatglot.config.show_translation_prefix"), config.showTranslationPrefix)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.showTranslationPrefix = value)
                 .build()
@@ -338,7 +338,7 @@ function jsonResponse(obj) {
         general.addEntry(
             entryBuilder
                 .startBooleanToggle(
-                    Text.translatable("chatglot.config.preserve_leading_speaker_prefix"),
+                    Component.translatable("chatglot.config.preserve_leading_speaker_prefix"),
                     config.preserveLeadingSpeakerPrefix
                 )
                 .setDefaultValue(true)
@@ -348,7 +348,7 @@ function jsonResponse(obj) {
         general.addEntry(
             entryBuilder
                 .startBooleanToggle(
-                    Text.translatable("chatglot.config.use_shared_appdata_settings"),
+                    Component.translatable("chatglot.config.use_shared_appdata_settings"),
                     config.useSharedAppDataSettings
                 )
                 .setDefaultValue(false)
@@ -356,94 +356,94 @@ function jsonResponse(obj) {
                 .build()
         );
         general.addEntry(
-            entryBuilder.startIntField(Text.translatable("chatglot.config.request_timeout"), config.requestTimeoutSeconds)
+            entryBuilder.startIntField(Component.translatable("chatglot.config.request_timeout"), config.requestTimeoutSeconds)
                 .setDefaultValue(45)
                 .setSaveConsumer(value -> config.requestTimeoutSeconds = value)
                 .build()
         );
         general.addEntry(
             entryBuilder
-                .startIntField(Text.translatable("chatglot.config.max_concurrent_translations"), config.maxConcurrentTranslations)
+                .startIntField(Component.translatable("chatglot.config.max_concurrent_translations"), config.maxConcurrentTranslations)
                 .setDefaultValue(1)
                 .setSaveConsumer(value -> config.maxConcurrentTranslations = value)
                 .build()
         );
 
         // Keep provider tabs in requested order.
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.google"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
-        builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.gas"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.deepl"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.google"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.codex"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.translategemma_local"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.azure"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.openai"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.gemini"));
+        builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.anthropic"));
 
-        ConfigCategory deepL = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.deepl"));
+        ConfigCategory deepL = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.deepl"));
         deepL.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.deepl_key"), config.deeplApiKey)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.deepl_key"), config.deeplApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.deeplApiKey = value)
                 .build()
         );
         deepL.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.deepl_get_api_key"),
-                () -> Util.getOperatingSystem().open(DEEPL_API_KEYS_URL)
+                Component.translatable("chatglot.config.deepl_get_api_key"),
+                () -> Util.getPlatform().openUri(DEEPL_API_KEYS_URL)
             )
         );
         deepL.addEntry(
-            entryBuilder.startBooleanToggle(Text.translatable("chatglot.config.deepl_free"), config.deeplUseFreeApi)
+            entryBuilder.startBooleanToggle(Component.translatable("chatglot.config.deepl_free"), config.deeplUseFreeApi)
                 .setDefaultValue(true)
                 .setSaveConsumer(value -> config.deeplUseFreeApi = value)
                 .build()
         );
 
-        ConfigCategory google = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.google"));
+        ConfigCategory google = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.google"));
         google.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.google_key"), config.googleTranslateApiKey)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.google_key"), config.googleTranslateApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.googleTranslateApiKey = value)
                 .build()
         );
         google.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.google_get_api_key"),
-                () -> Util.getOperatingSystem().open(GOOGLE_TRANSLATE_API_KEYS_URL)
+                Component.translatable("chatglot.config.google_get_api_key"),
+                () -> Util.getPlatform().openUri(GOOGLE_TRANSLATE_API_KEYS_URL)
             )
         );
 
-        ConfigCategory gas = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gas"));
+        ConfigCategory gas = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.gas"));
         gas.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.gas_webapp_url"), config.gasWebAppUrl)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.gas_webapp_url"), config.gasWebAppUrl)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.gasWebAppUrl = value)
                 .build()
         );
         gas.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.gas_copy_script"),
+                Component.translatable("chatglot.config.gas_copy_script"),
                 () -> copyGasScriptTemplate(client)
             )
         );
         gas.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.gas_open_apps_script"),
-                () -> Util.getOperatingSystem().open(GAS_APPS_SCRIPT_HOME_URL)
+                Component.translatable("chatglot.config.gas_open_apps_script"),
+                () -> Util.getPlatform().openUri(GAS_APPS_SCRIPT_HOME_URL)
             )
         );
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step1")).build());
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step2")).build());
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step3")).build());
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step4")).build());
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step5")).build());
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step6")).build());
-        gas.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.guide.gas.step7")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step1")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step2")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step3")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step4")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step5")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step6")).build());
+        gas.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.guide.gas.step7")).build());
 
-        ConfigCategory codex = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.codex"));
+        ConfigCategory codex = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.codex"));
         codex.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.codex_token"), config.codexTokenFile)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.codex_token"), config.codexTokenFile)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.codexTokenFile = value)
                 .build()
@@ -451,11 +451,11 @@ function jsonResponse(obj) {
         codex.addEntry(
             entryBuilder
                 .startDropdownMenu(
-                    Text.translatable("chatglot.config.codex_model"),
+                    Component.translatable("chatglot.config.codex_model"),
                     selectedCodexModel,
                     value -> resolveModelFromInput(value, selectableCodexModels, selectedCodexModel),
-                    Text::literal,
-                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                    Component::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Component::literal)
                 )
                 .setSelections(selectableCodexModels)
                 .setDefaultValue(defaultCodexModel)
@@ -465,58 +465,58 @@ function jsonResponse(obj) {
         );
         codex.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.codex_auth_start"),
+                Component.translatable("chatglot.config.codex_auth_start"),
                 () -> startCodexAuthFlow(runtime, config, parent)
             )
         );
         codex.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.codex_model_refresh"),
+                Component.translatable("chatglot.config.codex_model_refresh"),
                 () -> refreshCodexModelList(runtime, parent)
             )
         );
         CodexReasoningOption codexReasoningOption = CodexReasoningOption.fromConfigValue(config.codexReasoningEffort);
         codex.addEntry(
             entryBuilder.startEnumSelector(
-                    Text.translatable("chatglot.config.codex_effort"),
+                    Component.translatable("chatglot.config.codex_effort"),
                     CodexReasoningOption.class,
                     codexReasoningOption
                 )
                 .setDefaultValue(CodexReasoningOption.MEDIUM)
                 .setEnumNameProvider(
-                    option -> Text.translatable("chatglot.config.codex_effort." + option.name().toLowerCase(Locale.ROOT))
+                    option -> Component.translatable("chatglot.config.codex_effort." + option.name().toLowerCase(Locale.ROOT))
                 )
                 .setSaveConsumer(value -> config.codexReasoningEffort = value.apiValue())
                 .build()
         );
         codex.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.codex_summary"), config.codexReasoningSummary)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.codex_summary"), config.codexReasoningSummary)
                 .setDefaultValue("auto")
                 .setSaveConsumer(value -> config.codexReasoningSummary = value)
                 .build()
         );
 
-        ConfigCategory openai = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.openai"));
+        ConfigCategory openai = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.openai"));
         openai.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.openai_key"), config.openaiApiKey)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.openai_key"), config.openaiApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.openaiApiKey = value)
                 .build()
         );
         openai.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.openai_get_api_key"),
-                () -> Util.getOperatingSystem().open(OPENAI_API_KEYS_URL)
+                Component.translatable("chatglot.config.openai_get_api_key"),
+                () -> Util.getPlatform().openUri(OPENAI_API_KEYS_URL)
             )
         );
         openai.addEntry(
             entryBuilder
                 .startDropdownMenu(
-                    Text.translatable("chatglot.config.openai_model"),
+                    Component.translatable("chatglot.config.openai_model"),
                     selectedOpenAiModel,
                     value -> resolveModelFromInput(value, selectableOpenAiModels, selectedOpenAiModel),
-                    Text::literal,
-                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                    Component::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Component::literal)
                 )
                 .setSelections(selectableOpenAiModels)
                 .setDefaultValue(defaultOpenAiModel)
@@ -526,32 +526,32 @@ function jsonResponse(obj) {
         );
         openai.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.openai_model_refresh"),
+                Component.translatable("chatglot.config.openai_model_refresh"),
                 () -> refreshOpenAiModelList(runtime, config, parent)
             )
         );
 
-        ConfigCategory gemini = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.gemini"));
+        ConfigCategory gemini = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.gemini"));
         gemini.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.gemini_key"), config.geminiApiKey)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.gemini_key"), config.geminiApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.geminiApiKey = value)
                 .build()
         );
         gemini.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.gemini_get_api_key"),
-                () -> Util.getOperatingSystem().open(GEMINI_API_KEYS_URL)
+                Component.translatable("chatglot.config.gemini_get_api_key"),
+                () -> Util.getPlatform().openUri(GEMINI_API_KEYS_URL)
             )
         );
         gemini.addEntry(
             entryBuilder
                 .startDropdownMenu(
-                    Text.translatable("chatglot.config.gemini_model"),
+                    Component.translatable("chatglot.config.gemini_model"),
                     selectedGeminiModel,
                     value -> resolveModelFromInput(value, selectableGeminiModels, selectedGeminiModel),
-                    Text::literal,
-                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                    Component::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Component::literal)
                 )
                 .setSelections(selectableGeminiModels)
                 .setDefaultValue(defaultGeminiModel)
@@ -561,32 +561,32 @@ function jsonResponse(obj) {
         );
         gemini.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.gemini_model_refresh"),
+                Component.translatable("chatglot.config.gemini_model_refresh"),
                 () -> refreshGeminiModelList(runtime, config, parent)
             )
         );
 
-        ConfigCategory anthropic = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.anthropic"));
+        ConfigCategory anthropic = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.anthropic"));
         anthropic.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.anthropic_key"), config.anthropicApiKey)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.anthropic_key"), config.anthropicApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.anthropicApiKey = value)
                 .build()
         );
         anthropic.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.anthropic_get_api_key"),
-                () -> Util.getOperatingSystem().open(ANTHROPIC_API_KEYS_URL)
+                Component.translatable("chatglot.config.anthropic_get_api_key"),
+                () -> Util.getPlatform().openUri(ANTHROPIC_API_KEYS_URL)
             )
         );
         anthropic.addEntry(
             entryBuilder
                 .startDropdownMenu(
-                    Text.translatable("chatglot.config.anthropic_model"),
+                    Component.translatable("chatglot.config.anthropic_model"),
                     selectedAnthropicModel,
                     value -> resolveModelFromInput(value, selectableAnthropicModels, selectedAnthropicModel),
-                    Text::literal,
-                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                    Component::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Component::literal)
                 )
                 .setSelections(selectableAnthropicModels)
                 .setDefaultValue(defaultAnthropicModel)
@@ -596,7 +596,7 @@ function jsonResponse(obj) {
         );
         anthropic.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.anthropic_model_refresh"),
+                Component.translatable("chatglot.config.anthropic_model_refresh"),
                 () -> refreshAnthropicModelList(runtime, config, parent)
             )
         );
@@ -604,49 +604,49 @@ function jsonResponse(obj) {
 
 
         ConfigCategory localGemma = builder.getOrCreateCategory(
-            Text.translatable("chatglot.config.category.provider.translategemma_local")
+            Component.translatable("chatglot.config.category.provider.translategemma_local")
         );
         localGemma.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_download_all"),
+                Component.translatable("chatglot.config.local_backend_download_all"),
                 () -> downloadAllAndStartLocalBackend(runtime, config, parent)
             )
         );
         localGemma.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_advanced"),
-                () -> MinecraftClient.getInstance().setScreen(createLocalBackendAdvancedScreen(create(parent)))
+                Component.translatable("chatglot.config.local_backend_advanced"),
+                () -> Minecraft.getInstance().setScreen(createLocalBackendAdvancedScreen(create(parent)))
             )
         );
-        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_windows_only")).build());
-        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_setup_notice")).build());
-        localGemma.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_save_notice")).build());
+        localGemma.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_windows_only")).build());
+        localGemma.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_setup_notice")).build());
+        localGemma.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_save_notice")).build());
         localGemma.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_base_url"), config.localBackendBaseUrl)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.local_backend_base_url"), config.localBackendBaseUrl)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.localBackendBaseUrl = value)
                 .build()
         );
         localGemma.addEntry(
-            entryBuilder.startIntField(Text.translatable("chatglot.config.local_backend_port"), config.localBackendPort)
+            entryBuilder.startIntField(Component.translatable("chatglot.config.local_backend_port"), config.localBackendPort)
                 .setDefaultValue(ChatglotConfig.LOCAL_BACKEND_DEFAULT_PORT)
                 .setSaveConsumer(value -> config.localBackendPort = value)
                 .build()
         );
         localGemma.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_shared_dir"), config.localBackendSharedDirectory)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.local_backend_shared_dir"), config.localBackendSharedDirectory)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.localBackendSharedDirectory = value)
                 .build()
         );
         localGemma.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_command"), config.localBackendCommand)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.local_backend_command"), config.localBackendCommand)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.localBackendCommand = value)
                 .build()
         );
         localGemma.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.local_backend_model_path"), config.localModelPath)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.local_backend_model_path"), config.localModelPath)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.localModelPath = value)
                 .build()
@@ -654,11 +654,11 @@ function jsonResponse(obj) {
         localGemma.addEntry(
             entryBuilder
                 .startDropdownMenu(
-                    Text.translatable("chatglot.config.local_backend_model_alias"),
+                    Component.translatable("chatglot.config.local_backend_model_alias"),
                     selectedTranslateGemmaModel,
                     value -> resolveModelFromInput(value, selectableTranslateGemmaModels, selectedTranslateGemmaModel),
-                    Text::literal,
-                    DropdownMenuBuilder.CellCreatorBuilder.of(Text::literal)
+                    Component::literal,
+                    DropdownMenuBuilder.CellCreatorBuilder.of(Component::literal)
                 )
                 .setSelections(selectableTranslateGemmaModels)
                 .setDefaultValue(defaultTranslateGemmaModel)
@@ -671,14 +671,14 @@ function jsonResponse(obj) {
             ? "http://127.0.0.1:" + config.localBackendPort
             : config.localBackendBaseUrl.trim();
         localGemma.addEntry(
-            entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_resolved_url", resolvedBackendUrl)).build()
+            entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_resolved_url", resolvedBackendUrl)).build()
         );
         localGemma.addEntry(
-            entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_resolved_shared_dir", resolvedSharedDir)).build()
+            entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_resolved_shared_dir", resolvedSharedDir)).build()
         );
         localGemma.addEntry(
             entryBuilder.startTextDescription(
-                Text.translatable(
+                Component.translatable(
                     "chatglot.config.local_backend_resolved_model_path",
                     LocalBackendPaths.resolveModelPath(config, LocalBackendPaths.resolveSharedRoot(config, runtime.configDir())).toString()
                 )
@@ -686,7 +686,7 @@ function jsonResponse(obj) {
         );
         localGemma.addEntry(
             entryBuilder.startTextDescription(
-                Text.translatable(
+                Component.translatable(
                     "chatglot.config.local_backend_log_file",
                     LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config, runtime.configDir())).toString()
                 )
@@ -695,32 +695,32 @@ function jsonResponse(obj) {
         if (!localBackendStatusMessage.getString().isBlank()) {
             localGemma.addEntry(
                 entryBuilder.startTextDescription(
-                    Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage)
+                    Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage)
                 ).build()
             );
         }
 
-        ConfigCategory azure = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.azure"));
+        ConfigCategory azure = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.azure"));
         azure.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.azure_key"), config.azureTranslatorApiKey)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.azure_key"), config.azureTranslatorApiKey)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.azureTranslatorApiKey = value)
                 .build()
         );
         azure.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.azure_get_api_key"),
-                () -> Util.getOperatingSystem().open(AZURE_TRANSLATOR_API_KEYS_URL)
+                Component.translatable("chatglot.config.azure_get_api_key"),
+                () -> Util.getPlatform().openUri(AZURE_TRANSLATOR_API_KEYS_URL)
             )
         );
         azure.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.azure_region"), config.azureTranslatorRegion)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.azure_region"), config.azureTranslatorRegion)
                 .setDefaultValue("")
                 .setSaveConsumer(value -> config.azureTranslatorRegion = value)
                 .build()
         );
         azure.addEntry(
-            entryBuilder.startStrField(Text.translatable("chatglot.config.azure_endpoint"), config.azureTranslatorEndpoint)
+            entryBuilder.startStrField(Component.translatable("chatglot.config.azure_endpoint"), config.azureTranslatorEndpoint)
                 .setDefaultValue(ChatglotConfig.AZURE_TRANSLATOR_DEFAULT_ENDPOINT)
                 .setSaveConsumer(value -> config.azureTranslatorEndpoint = value)
                 .build()
@@ -735,36 +735,36 @@ function jsonResponse(obj) {
 
         ConfigBuilder builder = ConfigBuilder.create()
             .setParentScreen(parent)
-            .setTitle(Text.translatable("chatglot.config.local_backend_advanced"));
+            .setTitle(Component.translatable("chatglot.config.local_backend_advanced"));
 
         ConfigEntryBuilder entryBuilder = builder.entryBuilder();
-        ConfigCategory category = builder.getOrCreateCategory(Text.translatable("chatglot.config.category.provider.translategemma_local"));
+        ConfigCategory category = builder.getOrCreateCategory(Component.translatable("chatglot.config.category.provider.translategemma_local"));
 
         category.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_setup"),
+                Component.translatable("chatglot.config.local_backend_setup"),
                 () -> setupLocalBackend(runtime, config, parent)
             )
         );
         category.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_download_model"),
+                Component.translatable("chatglot.config.local_backend_download_model"),
                 () -> downloadLocalModel(runtime, config, parent)
             )
         );
         category.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_reinstall_model"),
+                Component.translatable("chatglot.config.local_backend_reinstall_model"),
                 () -> reinstallLocalModel(runtime, config, parent)
             )
         );
         category.addEntry(
             new CodexAuthButtonEntry(
-                Text.translatable("chatglot.config.local_backend_status"),
+                Component.translatable("chatglot.config.local_backend_status"),
                 () -> checkLocalBackendStatus(runtime, config, parent)
             )
         );
-        category.addEntry(entryBuilder.startTextDescription(Text.translatable("chatglot.config.local_backend_advanced_notice")).build());
+        category.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_advanced_notice")).build());
         return builder.build();
     }
 
@@ -827,45 +827,41 @@ function jsonResponse(obj) {
         return value.trim();
     }
 
-    private static void copyGasScriptTemplate(MinecraftClient client) {
-        if (client == null || client.keyboard == null) {
+    private static void copyGasScriptTemplate(Minecraft client) {
+        if (client == null || client.keyboardHandler == null) {
             LOGGER.warn("Failed to copy GAS script: Minecraft keyboard is unavailable.");
             return;
         }
 
-        client.keyboard.setClipboard(GAS_SCRIPT_TEMPLATE);
+        client.keyboardHandler.setClipboard(GAS_SCRIPT_TEMPLATE);
         if (client.player != null) {
-            client.player.sendMessage(Text.translatable("chatglot.config.gas_script_copied"), false);
+            client.player.sendSystemMessage(Component.translatable("chatglot.config.gas_script_copied"));
         }
     }
 
     private static void refreshCodexModelList(ChatglotRuntime runtime, Screen parent) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         try {
             List<String> refreshed = runtime.codexModelCatalogService().refreshModels();
             LOGGER.info("Refreshed Codex model list from remote API. count={}", refreshed.size());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.codex_model_refresh.success", Integer.toString(refreshed.size())),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.codex_model_refresh.success", Integer.toString(refreshed.size())));
             }
             client.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh Codex model list: {}", e.getMessage());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.codex_model_refresh.failed", e.getMessage()),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.codex_model_refresh.failed", e.getMessage()));
             }
         }
     }
 
     private static void startCodexAuthFlow(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         if (client.player != null) {
-            client.player.sendMessage(Text.translatable("chatglot.config.codex_auth_starting"), false);
+            client.player.sendSystemMessage(Component.translatable("chatglot.config.codex_auth_starting"));
         }
 
         Thread authThread = new Thread(() -> {
@@ -881,10 +877,8 @@ function jsonResponse(obj) {
                 }
                 client.execute(() -> {
                     if (client.player != null) {
-                        client.player.sendMessage(
-                            Text.translatable("chatglot.config.codex_auth_start.success", tokenFile.toString()),
-                            false
-                        );
+                        client.player.sendSystemMessage(
+                            Component.translatable("chatglot.config.codex_auth_start.success", tokenFile.toString()));
                     }
                     client.setScreen(create(parent));
                 });
@@ -895,10 +889,8 @@ function jsonResponse(obj) {
                 }
                 client.execute(() -> {
                     if (client.player != null) {
-                        client.player.sendMessage(
-                            Text.translatable("chatglot.config.codex_auth_start.failed", e.getMessage()),
-                            false
-                        );
+                        client.player.sendSystemMessage(
+                            Component.translatable("chatglot.config.codex_auth_start.failed", e.getMessage()));
                     }
                 });
             }
@@ -915,53 +907,45 @@ function jsonResponse(obj) {
     }
 
     private static void refreshOpenAiModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         try {
             List<String> refreshed = runtime.openAiModelCatalogService().refreshModels(config.openaiApiKey, config.requestTimeoutSeconds);
             LOGGER.info("Refreshed OpenAI model list from remote API. count={}", refreshed.size());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.openai_model_refresh.success", Integer.toString(refreshed.size())),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.openai_model_refresh.success", Integer.toString(refreshed.size())));
             }
             client.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh OpenAI model list: {}", e.getMessage());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.openai_model_refresh.failed", e.getMessage()),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.openai_model_refresh.failed", e.getMessage()));
             }
         }
     }
 
     private static void refreshGeminiModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         try {
             List<String> refreshed = runtime.geminiModelCatalogService().refreshModels(config.geminiApiKey, config.requestTimeoutSeconds);
             LOGGER.info("Refreshed Gemini model list from remote API. count={}", refreshed.size());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.gemini_model_refresh.success", Integer.toString(refreshed.size())),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.gemini_model_refresh.success", Integer.toString(refreshed.size())));
             }
             client.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh Gemini model list: {}", e.getMessage());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.gemini_model_refresh.failed", e.getMessage()),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.gemini_model_refresh.failed", e.getMessage()));
             }
         }
     }
 
     private static void refreshAnthropicModelList(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
-        MinecraftClient client = MinecraftClient.getInstance();
+        Minecraft client = Minecraft.getInstance();
         try {
             List<String> refreshed = runtime.anthropicModelCatalogService().refreshModels(
                 config.anthropicApiKey,
@@ -969,19 +953,15 @@ function jsonResponse(obj) {
             );
             LOGGER.info("Refreshed Anthropic model list from remote API. count={}", refreshed.size());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.anthropic_model_refresh.success", Integer.toString(refreshed.size())),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.anthropic_model_refresh.success", Integer.toString(refreshed.size())));
             }
             client.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh Anthropic model list: {}", e.getMessage());
             if (client.player != null) {
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.anthropic_model_refresh.failed", e.getMessage()),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.anthropic_model_refresh.failed", e.getMessage()));
             }
         }
     }
@@ -1036,7 +1016,7 @@ function jsonResponse(obj) {
     }
 
     private interface LocalBackendAction {
-        LocalBackendStatus run(java.util.function.Consumer<Text> progressListener) throws Exception;
+        LocalBackendStatus run(java.util.function.Consumer<Component> progressListener) throws Exception;
     }
 
     private static void runLocalBackendAction(
@@ -1047,10 +1027,10 @@ function jsonResponse(obj) {
         String actionName,
         boolean suspendAutoTranslate
     ) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        updateLocalBackendProgress(client, parent, Text.translatable("chatglot.local_backend.action_started", actionName), true);
+        Minecraft client = Minecraft.getInstance();
+        updateLocalBackendProgress(client, parent, Component.translatable("chatglot.local_backend.action_started", actionName), true);
         Thread worker = new Thread(() -> {
-            java.util.function.Consumer<Text> progressListener = message ->
+            java.util.function.Consumer<Component> progressListener = message ->
                 updateLocalBackendProgress(client, parent, message, true);
             boolean previousAutoTranslateEnabled = config.autoTranslateEnabled;
             boolean previousAutoTranslateEnabledWhenSupported = config.autoTranslateEnabledWhenSupported;
@@ -1070,10 +1050,8 @@ function jsonResponse(obj) {
                 }
                 client.execute(() -> {
                     if (client.player != null) {
-                        client.player.sendMessage(
-                            Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
-                            false
-                        );
+                        client.player.sendSystemMessage(
+                            Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage));
                     }
                     if (parent != null) {
                         client.setScreen(create(parent));
@@ -1083,14 +1061,12 @@ function jsonResponse(obj) {
                 if (suspendAutoTranslate) {
                     restoreAutoTranslate(runtime, config, previousAutoTranslateEnabled, previousAutoTranslateEnabledWhenSupported);
                 }
-                localBackendStatusMessage = Text.translatable("chatglot.local_backend.action_failed", actionName, e.getMessage());
+                localBackendStatusMessage = Component.translatable("chatglot.local_backend.action_failed", actionName, e.getMessage());
                 LOGGER.warn("Failed local TranslateGemma {}: {}", actionName, e.getMessage());
                 client.execute(() -> {
                     if (client.player != null) {
-                        client.player.sendMessage(
-                            Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
-                            false
-                        );
+                        client.player.sendSystemMessage(
+                            Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage));
                     }
                     if (parent != null) {
                         client.setScreen(create(parent));
@@ -1116,7 +1092,7 @@ function jsonResponse(obj) {
 
     private static volatile String lastLocalBackendChatMessage = "";
 
-    private static void updateLocalBackendProgress(MinecraftClient client, Screen parent, Text message, boolean sendChatMessage) {
+    private static void updateLocalBackendProgress(Minecraft client, Screen parent, Component message, boolean sendChatMessage) {
         localBackendStatusMessage = message;
         if (client == null) {
             return;
@@ -1126,26 +1102,24 @@ function jsonResponse(obj) {
             String plain = message.getString();
             if (sendChatMessage && client.player != null && !plain.equals(lastLocalBackendChatMessage)) {
                 lastLocalBackendChatMessage = plain;
-                client.player.sendMessage(
-                    Text.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage),
-                    false
-                );
+                client.player.sendSystemMessage(
+                    Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage));
             }
-            if (parent != null && client.currentScreen != null) {
+            if (parent != null && client.screen != null) {
                 client.setScreen(create(parent));
             }
         });
     }
 
-    private static List<MinecraftLanguageOption> collectLanguageOptions(MinecraftClient client) {
+    private static List<MinecraftLanguageOption> collectLanguageOptions(Minecraft client) {
         if (client == null || client.getLanguageManager() == null) {
             return List.of(new MinecraftLanguageOption("en_us", "English (US)"));
         }
 
         List<MinecraftLanguageOption> result = new ArrayList<>();
-        for (Map.Entry<String, LanguageDefinition> entry : client.getLanguageManager().getAllLanguages().entrySet()) {
+        for (Map.Entry<String, LanguageInfo> entry : client.getLanguageManager().getLanguages().entrySet()) {
             String code = entry.getKey();
-            String label = entry.getValue().getDisplayText().getString();
+            String label = entry.getValue().toComponent().getString();
             result.add(new MinecraftLanguageOption(code, label));
         }
         result.sort((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.label(), right.label()));
@@ -1156,14 +1130,14 @@ function jsonResponse(obj) {
     }
 
     private static MinecraftLanguageOption resolveCurrentLanguageOption(
-        MinecraftClient client,
+        Minecraft client,
         List<MinecraftLanguageOption> options
     ) {
         if (client == null || client.getLanguageManager() == null) {
             return options.getFirst();
         }
 
-        return findOptionByCode(options, client.getLanguageManager().getLanguage()).orElse(options.getFirst());
+        return findOptionByCode(options, client.getLanguageManager().getSelected()).orElse(options.getFirst());
     }
 
     private static MinecraftLanguageOption resolveSelectedLanguageOption(
@@ -1204,7 +1178,7 @@ function jsonResponse(obj) {
 
     private static MinecraftLanguageOption createDefaultLanguageOption(MinecraftLanguageOption currentLanguageOption) {
         String currentLabel = currentLanguageOption.label();
-        String label = Text.translatable("chatglot.config.target_language.default", currentLabel).getString();
+        String label = Component.translatable("chatglot.config.target_language.default", currentLabel).getString();
         return new MinecraftLanguageOption(LanguageUtil.MINECRAFT_DEFAULT_TARGET, label);
     }
 
@@ -1291,6 +1265,7 @@ function jsonResponse(obj) {
         return normalizeLanguageCode(optionCode);
     }
 }
+
 
 
 

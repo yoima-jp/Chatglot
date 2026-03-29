@@ -6,8 +6,8 @@ import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.TranslationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import net.minecraft.network.message.MessageSignatureData;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MessageSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,10 +23,10 @@ public final class ChatTranslationActions {
 
     public static void translateAndPublish(
         String originalText,
-        Text originalMessage,
+        Component originalMessage,
         String sourceLanguageHint,
         boolean automatic,
-        MessageSignatureData originalSignature
+        MessageSignature originalSignature
     ) {
         if (originalText == null || originalText.isBlank()) {
             return;

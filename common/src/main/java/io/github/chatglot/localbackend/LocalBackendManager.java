@@ -8,11 +8,12 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,8 +69,8 @@ public final class LocalBackendManager {
         boolean healthy = healthChecker.isHealthy(baseUrl, Math.min(10, config.requestTimeoutSeconds));
         boolean running = isProcessAlive(state.pid);
         boolean modelPresent = Files.exists(modelPath);
-        Text runtimeMessage = resolveRuntimeMessage(config, sharedRoot);
-        Text message;
+        Component runtimeMessage = resolveRuntimeMessage(config, sharedRoot);
+        Component message;
         if (healthy) {
             message = LocalBackendTexts.backendHealthy(runtimeMessage, modelPath.toString());
         } else if (running) {
@@ -87,7 +88,7 @@ public final class LocalBackendManager {
         });
     }
 
-    public LocalBackendStatus setupAndStart(ChatglotConfig config, Consumer<Text> progressListener) throws IOException {
+    public LocalBackendStatus setupAndStart(ChatglotConfig config, Consumer<Component> progressListener) throws IOException {
         Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
@@ -128,16 +129,37 @@ public final class LocalBackendManager {
 
         LocalBackendStateStore store = new LocalBackendStateStore(sharedRoot);
         LocalBackendState state = store.load();
+        List<String> desiredCommand = buildCommand(config, runtimePath, modelPath);
+        String desiredLaunchSignature = buildLaunchSignature(desiredCommand);
         state.port = config.localBackendPort;
+        state.parallelRequests = resolveParallelRequests(config);
         state.runtimePath = runtimePath.getParent() == null ? sharedRoot.toString() : runtimePath.getParent().toString();
         state.executablePath = runtimePath.toString();
         state.modelPath = modelPath.toString();
         state.downloadUrl = config.localModelDownloadUrl == null ? "" : config.localModelDownloadUrl.trim();
+        state.launchSignature = desiredLaunchSignature;
 
         if (healthChecker.isHealthy(baseUrl, Math.min(10, config.requestTimeoutSeconds))) {
-            state.lastKnownHealthyEpochMillis = Instant.now().toEpochMilli();
-            store.save(state);
-            return new LocalBackendStatus("backend_already_healthy", true, true, true, baseUrl, sharedRoot, state.modelPath, LocalBackendTexts.backendAlreadyHealthy(runtimePath.toString(), modelPath.toString()));
+            if (managedBackendMatchesConfig(state, runtimePath, modelPath, desiredLaunchSignature)) {
+                state.lastKnownHealthyEpochMillis = Instant.now().toEpochMilli();
+                store.save(state);
+                return new LocalBackendStatus("backend_already_healthy", true, true, true, baseUrl, sharedRoot, state.modelPath, LocalBackendTexts.backendAlreadyHealthy(runtimePath.toString(), modelPath.toString()));
+            }
+
+            stopManagedBackend(sharedRoot);
+            state = store.load();
+            state.port = config.localBackendPort;
+            state.parallelRequests = resolveParallelRequests(config);
+            state.runtimePath = runtimePath.getParent() == null ? sharedRoot.toString() : runtimePath.getParent().toString();
+            state.executablePath = runtimePath.toString();
+            state.modelPath = modelPath.toString();
+            state.downloadUrl = config.localModelDownloadUrl == null ? "" : config.localModelDownloadUrl.trim();
+            state.launchSignature = desiredLaunchSignature;
+            if (healthChecker.isHealthy(baseUrl, Math.min(10, config.requestTimeoutSeconds))) {
+                state.lastKnownHealthyEpochMillis = Instant.now().toEpochMilli();
+                store.save(state);
+                return new LocalBackendStatus("backend_already_healthy", true, true, true, baseUrl, sharedRoot, state.modelPath, LocalBackendTexts.backendAlreadyHealthy(runtimePath.toString(), modelPath.toString()));
+            }
         }
 
         if (isProcessAlive(state.pid)) {
@@ -154,7 +176,7 @@ public final class LocalBackendManager {
         }
 
         progressListener.accept(LocalBackendTexts.startingServer());
-        ProcessBuilder processBuilder = new ProcessBuilder(buildCommand(config, runtimePath, modelPath));
+        ProcessBuilder processBuilder = new ProcessBuilder(desiredCommand);
         processBuilder.directory(sharedRoot.toFile());
         processBuilder.redirectErrorStream(true);
         processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(LocalBackendPaths.logFile(sharedRoot).toFile()));
@@ -261,7 +283,7 @@ public final class LocalBackendManager {
         });
     }
 
-    public LocalBackendStatus downloadAllAndStart(ChatglotConfig config, Consumer<Text> progressListener) {
+    public LocalBackendStatus downloadAllAndStart(ChatglotConfig config, Consumer<Component> progressListener) {
         LocalBackendStatus runtimeStatus = downloadRuntime(config, progressListener);
         if ("runtime_download_failed".equals(runtimeStatus.code()) || "runtime_override_missing".equals(runtimeStatus.code())) {
             return runtimeStatus;
@@ -299,7 +321,7 @@ public final class LocalBackendManager {
         });
     }
 
-    public LocalBackendStatus downloadRuntime(ChatglotConfig config, Consumer<Text> progressListener) {
+    public LocalBackendStatus downloadRuntime(ChatglotConfig config, Consumer<Component> progressListener) {
         Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
@@ -325,7 +347,7 @@ public final class LocalBackendManager {
         }
     }
 
-    public LocalBackendStatus downloadModel(ChatglotConfig config, Consumer<Text> progressListener) {
+    public LocalBackendStatus downloadModel(ChatglotConfig config, Consumer<Component> progressListener) {
         Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
@@ -359,7 +381,7 @@ public final class LocalBackendManager {
         });
     }
 
-    public LocalBackendStatus reinstallModel(ChatglotConfig config, Consumer<Text> progressListener) {
+    public LocalBackendStatus reinstallModel(ChatglotConfig config, Consumer<Component> progressListener) {
         Path sharedRoot = LocalBackendPaths.resolveSharedRoot(config, configDir);
         String baseUrl = resolveBaseUrl(config);
         if (!isWindows()) {
@@ -436,7 +458,7 @@ public final class LocalBackendManager {
         return roots;
     }
 
-    private Text resolveRuntimeMessage(ChatglotConfig config, Path sharedRoot) {
+    private Component resolveRuntimeMessage(ChatglotConfig config, Path sharedRoot) {
         if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
             return LocalBackendTexts.runtimeMessage(Path.of(config.localBackendCommand.trim()).toString());
         }
@@ -449,6 +471,7 @@ public final class LocalBackendManager {
     }
 
     private static List<String> buildCommand(ChatglotConfig config, Path runtimePath, Path modelPath) {
+        int parallelRequests = resolveParallelRequests(config);
         if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
             String command = config.localBackendCommand.trim();
             if (command.endsWith(".cmd") || command.endsWith(".bat")) {
@@ -464,7 +487,9 @@ public final class LocalBackendManager {
                     "--model",
                     modelPath.toString(),
                     "--alias",
-                    resolveAlias(config)
+                    resolveAlias(config),
+                    "--parallel",
+                    Integer.toString(parallelRequests)
                 );
             }
         }
@@ -481,9 +506,34 @@ public final class LocalBackendManager {
             modelPath.toString(),
             "--alias",
             resolveAlias(config),
+            "--parallel",
+            Integer.toString(parallelRequests),
             "--ctx-size",
             "4096"
         );
+    }
+
+    private static int resolveParallelRequests(ChatglotConfig config) {
+        return Math.max(1, config.maxConcurrentTranslations);
+    }
+
+    private static String buildLaunchSignature(List<String> command) {
+        return String.join("\u001F", command);
+    }
+
+    private static boolean managedBackendMatchesConfig(
+        LocalBackendState state,
+        Path runtimePath,
+        Path modelPath,
+        String desiredLaunchSignature
+    ) {
+        long currentPid = ProcessHandle.current().pid();
+        if (state.ownerPid == null || state.ownerPid != currentPid || state.pid == null || !isProcessAlive(state.pid)) {
+            return false;
+        }
+        return Objects.equals(state.executablePath, runtimePath.toString())
+            && Objects.equals(state.modelPath, modelPath.toString())
+            && Objects.equals(state.launchSignature, desiredLaunchSignature);
     }
 
     private static String resolveAlias(ChatglotConfig config) {

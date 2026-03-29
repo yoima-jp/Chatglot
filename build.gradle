@@ -1,7 +1,5 @@
 plugins {
-    id 'dev.architectury.loom' version '1.13-SNAPSHOT' apply false
-    id 'architectury-plugin' version '3.4-SNAPSHOT'
-    id 'com.gradleup.shadow' version '8.3.8' apply false
+    id 'net.fabricmc.fabric-loom' version '1.15.5' apply false
 }
 
 def buildDate = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tokyo"))
@@ -9,18 +7,13 @@ def buildDate = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Tokyo"))
 def computedModVersion = "${buildDate}-mc${minecraft_version}"
 rootProject.ext.set("mod_version", computedModVersion)
 
-architectury {
-    minecraft = project.minecraft_version
-}
-
 allprojects {
     group = rootProject.maven_group
     version = rootProject.ext.mod_version
 }
 
 subprojects {
-    apply plugin: 'dev.architectury.loom'
-    apply plugin: 'architectury-plugin'
+    apply plugin: 'net.fabricmc.fabric-loom'
     apply plugin: 'maven-publish'
 
     base {
@@ -28,8 +21,6 @@ subprojects {
     }
 
     loom {
-        silentMojangMappingsLicense()
-
         runs {
             client {
                 programArgs '--username', 'ChatglotDev'
@@ -56,7 +47,6 @@ subprojects {
 
     dependencies {
         minecraft "com.mojang:minecraft:${rootProject.minecraft_version}"
-        mappings "net.fabricmc:yarn:${rootProject.yarn_mappings}:v2"
     }
 
     java {

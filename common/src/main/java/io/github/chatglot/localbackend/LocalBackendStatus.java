@@ -1,7 +1,7 @@
 package io.github.chatglot.localbackend;
 
 import java.nio.file.Path;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public record LocalBackendStatus(
     String code,
@@ -11,5 +11,5 @@ public record LocalBackendStatus(
     String backendUrl,
     Path sharedRoot,
     String modelPath,
-    Text message
+    Component message
 ) {}

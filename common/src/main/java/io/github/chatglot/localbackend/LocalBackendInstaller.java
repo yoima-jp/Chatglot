@@ -20,7 +20,7 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public final class LocalBackendInstaller {
     private static final String LLAMA_CPP_RELEASE_API_URL = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
@@ -58,7 +58,7 @@ public final class LocalBackendInstaller {
         return resolveInstalledRuntime(config, sharedRoot) != null;
     }
 
-    public Path ensureRuntime(ChatglotConfig config, Path sharedRoot, Consumer<Text> progressListener) throws IOException {
+    public Path ensureRuntime(ChatglotConfig config, Path sharedRoot, Consumer<Component> progressListener) throws IOException {
         if (config.localBackendCommand != null && !config.localBackendCommand.isBlank()) {
             Path override = Path.of(config.localBackendCommand.trim());
             if (!Files.exists(override)) {
@@ -102,7 +102,7 @@ public final class LocalBackendInstaller {
         });
     }
 
-    public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot, Consumer<Text> progressListener) throws IOException {
+    public Path ensureModelDownloaded(ChatglotConfig config, Path sharedRoot, Consumer<Component> progressListener) throws IOException {
         Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
         if (Files.exists(modelPath) && Files.size(modelPath) > 0) {
             progressListener.accept(LocalBackendTexts.modelAlreadyPresent(modelPath.toString()));
@@ -186,7 +186,7 @@ public final class LocalBackendInstaller {
         Path destination,
         Duration timeout,
         String progressLabel,
-        Consumer<Text> progressListener
+        Consumer<Component> progressListener
     ) throws IOException {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url))
             .timeout(timeout)
@@ -216,7 +216,7 @@ public final class LocalBackendInstaller {
         Path destination,
         long contentLength,
         String progressLabel,
-        Consumer<Text> progressListener
+        Consumer<Component> progressListener
     ) throws IOException {
         Files.createDirectories(destination.getParent());
         byte[] buffer = new byte[8192];

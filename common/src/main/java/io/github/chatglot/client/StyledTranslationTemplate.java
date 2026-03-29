@@ -6,16 +6,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 
 final class StyledTranslationTemplate {
     private static final String TOKEN_PREFIX = "[[CGT_";
     private static final String TOKEN_SUFFIX = "]]";
     private static final String TOKEN_CLOSE_PREFIX = "[[/CGT_";
-    private static final Style DEFAULT_TEXT_STYLE = Style.EMPTY.withColor(Formatting.WHITE);
+    private static final Style DEFAULT_TEXT_STYLE = Style.EMPTY.withColor(ChatFormatting.WHITE);
     private static final Pattern LEADING_SPEAKER_PATTERN = Pattern.compile("^(<[^<>\\r\\n]+>\\s*)");
 
     private final String markedText;
@@ -30,7 +30,7 @@ final class StyledTranslationTemplate {
         this.preservedPrefix = preservedPrefix == null ? "" : preservedPrefix;
     }
 
-    public static StyledTranslationTemplate create(Text originalMessage, String fallbackPlainText, boolean preserveLeadingSpeakerPrefix) {
+    public static StyledTranslationTemplate create(Component originalMessage, String fallbackPlainText, boolean preserveLeadingSpeakerPrefix) {
         String plainText = fallbackPlainText;
         if ((plainText == null || plainText.isEmpty()) && originalMessage != null) {
             plainText = originalMessage.getString();
@@ -83,13 +83,13 @@ final class StyledTranslationTemplate {
         return markedText;
     }
 
-    public Text apply(String translatedText) {
+    public Component apply(String translatedText) {
         String value = translatedText == null ? "" : translatedText;
         if (segments.isEmpty()) {
-            return Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
+            return Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
         }
 
-        MutableText rebuilt = Text.empty();
+        MutableComponent rebuilt = Component.empty();
         appendLiteral(rebuilt, preservedPrefix, fallbackStyle);
         int cursor = 0;
         boolean appliedMarker = false;
@@ -97,7 +97,7 @@ final class StyledTranslationTemplate {
             SegmentMatch nextSegment = findNextSegment(value, cursor);
             if (nextSegment == null) {
                 appendLiteral(rebuilt, value.substring(cursor), fallbackStyle);
-                return appliedMarker ? rebuilt : Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
+                return appliedMarker ? rebuilt : Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
             }
 
             if (nextSegment.startIndex() > cursor) {
@@ -107,7 +107,7 @@ final class StyledTranslationTemplate {
             int contentStart = nextSegment.startIndex() + nextSegment.segment().openToken().length();
             int contentEnd = value.indexOf(nextSegment.segment().closeToken(), contentStart);
             if (contentEnd < 0) {
-                return Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
+                return Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
             }
 
             appendLiteral(rebuilt, value.substring(contentStart, contentEnd), nextSegment.segment().style());
@@ -115,7 +115,7 @@ final class StyledTranslationTemplate {
             appliedMarker = true;
         }
 
-        return appliedMarker ? rebuilt : Text.literal(preservedPrefix + value).setStyle(fallbackStyle);
+        return appliedMarker ? rebuilt : Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
     }
 
     private static PrefixMatch extractLeadingSpeakerPrefix(String plainText) {
@@ -146,18 +146,18 @@ final class StyledTranslationTemplate {
         return earliest;
     }
 
-    private static void appendLiteral(MutableText target, String text, Style style) {
+    private static void appendLiteral(MutableComponent target, String text, Style style) {
         if (text == null || text.isEmpty()) {
             return;
         }
-        target.append(Text.literal(text).setStyle(mergeWithDefaultStyle(style)));
+        target.append(Component.literal(text).setStyle(mergeWithDefaultStyle(style)));
     }
 
     private static Style mergeWithDefaultStyle(Style style) {
         if (style == null) {
             return DEFAULT_TEXT_STYLE;
         }
-        return style.withParent(DEFAULT_TEXT_STYLE);
+        return style.applyTo(DEFAULT_TEXT_STYLE);
     }
 
     private record Segment(String openToken, String closeToken, Style style) {

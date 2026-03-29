@@ -1,160 +1,160 @@
 package io.github.chatglot.localbackend;
 
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
 
 public final class LocalBackendTexts {
     private LocalBackendTexts() {
     }
 
-    public static Text unsupportedOs() {
-        return Text.translatable("chatglot.local_backend.unsupported_os");
+    public static Component unsupportedOs() {
+        return Component.translatable("chatglot.local_backend.unsupported_os");
     }
 
-    public static Text backendHealthy(Text runtimeMessage, String modelPath) {
-        return Text.translatable("chatglot.local_backend.backend_healthy", runtimeMessage, modelPath);
+    public static Component backendHealthy(Component runtimeMessage, String modelPath) {
+        return Component.translatable("chatglot.local_backend.backend_healthy", runtimeMessage, modelPath);
     }
 
-    public static Text backendStarting(Text runtimeMessage, String modelPath) {
-        return Text.translatable("chatglot.local_backend.backend_starting", runtimeMessage, modelPath);
+    public static Component backendStarting(Component runtimeMessage, String modelPath) {
+        return Component.translatable("chatglot.local_backend.backend_starting", runtimeMessage, modelPath);
     }
 
-    public static Text backendNotReachableMissingModel(Text runtimeMessage, String modelPath) {
-        return Text.translatable("chatglot.local_backend.backend_not_reachable_missing_model", runtimeMessage, modelPath);
+    public static Component backendNotReachableMissingModel(Component runtimeMessage, String modelPath) {
+        return Component.translatable("chatglot.local_backend.backend_not_reachable_missing_model", runtimeMessage, modelPath);
     }
 
-    public static Text backendNotReachable(Text runtimeMessage, String modelPath) {
-        return Text.translatable("chatglot.local_backend.backend_not_reachable", runtimeMessage, modelPath);
+    public static Component backendNotReachable(Component runtimeMessage, String modelPath) {
+        return Component.translatable("chatglot.local_backend.backend_not_reachable", runtimeMessage, modelPath);
     }
 
-    public static Text preparingFolders() {
-        return Text.translatable("chatglot.local_backend.progress.preparing_folders");
+    public static Component preparingFolders() {
+        return Component.translatable("chatglot.local_backend.progress.preparing_folders");
     }
 
-    public static Text runtimeMissing() {
-        return Text.translatable("chatglot.local_backend.runtime_missing");
+    public static Component runtimeMissing() {
+        return Component.translatable("chatglot.local_backend.runtime_missing");
     }
 
-    public static Text modelMissing() {
-        return Text.translatable("chatglot.local_backend.model_missing");
+    public static Component modelMissing() {
+        return Component.translatable("chatglot.local_backend.model_missing");
     }
 
-    public static Text backendAlreadyHealthy(String runtimePath, String modelPath) {
-        return Text.translatable("chatglot.local_backend.backend_already_healthy", runtimePath, modelPath);
+    public static Component backendAlreadyHealthy(String runtimePath, String modelPath) {
+        return Component.translatable("chatglot.local_backend.backend_already_healthy", runtimePath, modelPath);
     }
 
-    public static Text backendAlreadyStarting() {
-        return Text.translatable("chatglot.local_backend.backend_already_starting");
+    public static Component backendAlreadyStarting() {
+        return Component.translatable("chatglot.local_backend.backend_already_starting");
     }
 
-    public static Text startingServer() {
-        return Text.translatable("chatglot.local_backend.progress.starting_server");
+    public static Component startingServer() {
+        return Component.translatable("chatglot.local_backend.progress.starting_server");
     }
 
-    public static Text waitingHealthCheck() {
-        return Text.translatable("chatglot.local_backend.progress.waiting_health_check");
+    public static Component waitingHealthCheck() {
+        return Component.translatable("chatglot.local_backend.progress.waiting_health_check");
     }
 
-    public static Text backendStartedHealthy(String runtimePath, String modelPath) {
-        return Text.translatable("chatglot.local_backend.backend_started_healthy", runtimePath, modelPath);
+    public static Component backendStartedHealthy(String runtimePath, String modelPath) {
+        return Component.translatable("chatglot.local_backend.backend_started_healthy", runtimePath, modelPath);
     }
 
-    public static Text backendStartedHealthCheckFailed(String logFile) {
-        return Text.translatable("chatglot.local_backend.backend_started_healthcheck_failed", logFile);
+    public static Component backendStartedHealthCheckFailed(String logFile) {
+        return Component.translatable("chatglot.local_backend.backend_started_healthcheck_failed", logFile);
     }
 
-    public static Text backendStartFailed(String error) {
-        return Text.translatable("chatglot.local_backend.backend_start_failed", error);
+    public static Component backendStartFailed(String error) {
+        return Component.translatable("chatglot.local_backend.backend_start_failed", error);
     }
 
-    public static Text startingAfterDownloads() {
-        return Text.translatable("chatglot.local_backend.progress.start_after_downloads");
+    public static Component startingAfterDownloads() {
+        return Component.translatable("chatglot.local_backend.progress.start_after_downloads");
     }
 
-    public static Text backendStartAfterDownloadsFailed(String error) {
-        return Text.translatable("chatglot.local_backend.backend_start_after_downloads_failed", error);
+    public static Component backendStartAfterDownloadsFailed(String error) {
+        return Component.translatable("chatglot.local_backend.backend_start_after_downloads_failed", error);
     }
 
-    public static Text runtimeOverrideConfigured(String path) {
-        return Text.translatable("chatglot.local_backend.runtime_override_configured", path);
+    public static Component runtimeOverrideConfigured(String path) {
+        return Component.translatable("chatglot.local_backend.runtime_override_configured", path);
     }
 
-    public static Text runtimeOverrideMissing(String path) {
-        return Text.translatable("chatglot.local_backend.runtime_override_missing", path);
+    public static Component runtimeOverrideMissing(String path) {
+        return Component.translatable("chatglot.local_backend.runtime_override_missing", path);
     }
 
-    public static Text runtimeReady(String path) {
-        return Text.translatable("chatglot.local_backend.runtime_ready", path);
+    public static Component runtimeReady(String path) {
+        return Component.translatable("chatglot.local_backend.runtime_ready", path);
     }
 
-    public static Text runtimeDownloadFailed(String error) {
-        return Text.translatable("chatglot.local_backend.runtime_download_failed", error);
+    public static Component runtimeDownloadFailed(String error) {
+        return Component.translatable("chatglot.local_backend.runtime_download_failed", error);
     }
 
-    public static Text modelReady(String path) {
-        return Text.translatable("chatglot.local_backend.model_ready", path);
+    public static Component modelReady(String path) {
+        return Component.translatable("chatglot.local_backend.model_ready", path);
     }
 
-    public static Text modelDownloadFailed(String error) {
-        return Text.translatable("chatglot.local_backend.model_download_failed", error);
+    public static Component modelDownloadFailed(String error) {
+        return Component.translatable("chatglot.local_backend.model_download_failed", error);
     }
 
-    public static Text removedExistingModel(String path) {
-        return Text.translatable("chatglot.local_backend.progress.removed_model", path);
+    public static Component removedExistingModel(String path) {
+        return Component.translatable("chatglot.local_backend.progress.removed_model", path);
     }
 
-    public static Text modelReinstalled(String path) {
-        return Text.translatable("chatglot.local_backend.model_reinstalled", path);
+    public static Component modelReinstalled(String path) {
+        return Component.translatable("chatglot.local_backend.model_reinstalled", path);
     }
 
-    public static Text modelReinstallFailed(String error) {
-        return Text.translatable("chatglot.local_backend.model_reinstall_failed", error);
+    public static Component modelReinstallFailed(String error) {
+        return Component.translatable("chatglot.local_backend.model_reinstall_failed", error);
     }
 
-    public static Text runtimeMessage(String path) {
-        return Text.translatable("chatglot.local_backend.runtime_path", path);
+    public static Component runtimeMessage(String path) {
+        return Component.translatable("chatglot.local_backend.runtime_path", path);
     }
 
-    public static Text runtimeNotReady(String path) {
-        return Text.translatable("chatglot.local_backend.runtime_not_ready", path);
+    public static Component runtimeNotReady(String path) {
+        return Component.translatable("chatglot.local_backend.runtime_not_ready", path);
     }
 
-    public static Text autoTranslateTemporarilyDisabled() {
-        return Text.translatable("chatglot.local_backend.progress.auto_translate_disabled");
+    public static Component autoTranslateTemporarilyDisabled() {
+        return Component.translatable("chatglot.local_backend.progress.auto_translate_disabled");
     }
 
-    public static Text usingRuntimeOverride(String path) {
-        return Text.translatable("chatglot.local_backend.progress.using_runtime_override", path);
+    public static Component usingRuntimeOverride(String path) {
+        return Component.translatable("chatglot.local_backend.progress.using_runtime_override", path);
     }
 
-    public static Text usingManagedRuntime(String path) {
-        return Text.translatable("chatglot.local_backend.progress.using_managed_runtime", path);
+    public static Component usingManagedRuntime(String path) {
+        return Component.translatable("chatglot.local_backend.progress.using_managed_runtime", path);
     }
 
-    public static Text downloadingManagedRuntime() {
-        return Text.translatable("chatglot.local_backend.progress.downloading_runtime");
+    public static Component downloadingManagedRuntime() {
+        return Component.translatable("chatglot.local_backend.progress.downloading_runtime");
     }
 
-    public static Text downloadedManagedRuntime(String path) {
-        return Text.translatable("chatglot.local_backend.progress.downloaded_runtime", path);
+    public static Component downloadedManagedRuntime(String path) {
+        return Component.translatable("chatglot.local_backend.progress.downloaded_runtime", path);
     }
 
-    public static Text modelAlreadyPresent(String path) {
-        return Text.translatable("chatglot.local_backend.progress.model_already_present", path);
+    public static Component modelAlreadyPresent(String path) {
+        return Component.translatable("chatglot.local_backend.progress.model_already_present", path);
     }
 
-    public static Text downloadingModel(String url) {
-        return Text.translatable("chatglot.local_backend.progress.downloading_model_from", url);
+    public static Component downloadingModel(String url) {
+        return Component.translatable("chatglot.local_backend.progress.downloading_model_from", url);
     }
 
-    public static Text modelDownloadFinished(String path) {
-        return Text.translatable("chatglot.local_backend.progress.model_download_finished", path);
+    public static Component modelDownloadFinished(String path) {
+        return Component.translatable("chatglot.local_backend.progress.model_download_finished", path);
     }
 
-    public static Text downloadProgress(String label, String percent, String downloaded, String total) {
-        return Text.translatable("chatglot.local_backend.progress.download_percent", label, percent, downloaded, total);
+    public static Component downloadProgress(String label, String percent, String downloaded, String total) {
+        return Component.translatable("chatglot.local_backend.progress.download_percent", label, percent, downloaded, total);
     }
 
-    public static Text downloadProgressUnknown(String label, String downloaded) {
-        return Text.translatable("chatglot.local_backend.progress.download_bytes", label, downloaded);
+    public static Component downloadProgressUnknown(String label, String downloaded) {
+        return Component.translatable("chatglot.local_backend.progress.download_bytes", label, downloaded);
     }
 }

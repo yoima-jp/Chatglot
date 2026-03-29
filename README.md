@@ -71,6 +71,7 @@ Key settings:
 - `showTranslationPrefix` — Show or hide the translated-message prefix
 - `requestTimeoutSeconds` — Network timeout (`5`-`240` seconds)
 - `maxConcurrentTranslations` — Max parallel translation requests (`1`-`16`)
+  For `translategemma_local`, this also sets the managed `llama-server` `--parallel` value.
 - `useSharedAppDataSettings` — Share API keys, model settings, and local backend settings through `%LOCALAPPDATA%`
 
 ---

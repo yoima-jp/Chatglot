@@ -7,13 +7,13 @@ import io.github.chatglot.mixin.ChatHudAccessor;
 import io.github.chatglot.translation.TranslationResult;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.client.gui.hud.ChatHudLine;
-import net.minecraft.network.message.MessageSignatureData;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MessageSignature;
+import net.minecraft.network.chat.MutableComponent;
 
 public final class ChatOutput {
     private ChatOutput() {
@@ -22,16 +22,16 @@ public final class ChatOutput {
     static void postTranslation(
         TranslationResult result,
         String originalText,
-        MessageSignatureData originalSignature,
+        MessageSignature originalSignature,
         StyledTranslationTemplate template
     ) {
         String translatedText = result.translatedText() == null ? "" : result.translatedText();
         ChatglotConfig config = ChatglotRuntime.get().configManager().get();
-        MutableText message = Text.empty();
+        MutableComponent message = Component.empty();
         if (config.showTranslationPrefix) {
             message.append(
-                Text.translatable("chatglot.translation.tag").formatted(Formatting.AQUA)
-                    .append(Text.translatable("chatglot.translation.arrow").formatted(Formatting.GRAY))
+                Component.translatable("chatglot.translation.tag").withStyle(ChatFormatting.AQUA)
+                    .append(Component.translatable("chatglot.translation.arrow").withStyle(ChatFormatting.GRAY))
             );
         }
         message.append(template.apply(translatedText));
@@ -39,30 +39,30 @@ public final class ChatOutput {
     }
 
     public static void postError(String message) {
-        post(Text.literal(ChatglotConstants.INTERNAL_PREFIX + " " + message).formatted(Formatting.RED));
+        post(Component.literal(ChatglotConstants.INTERNAL_PREFIX + " " + message).withStyle(ChatFormatting.RED));
     }
 
     public static void postInfo(String message) {
-        post(Text.literal(ChatglotConstants.INTERNAL_PREFIX + " " + message).formatted(Formatting.GRAY));
+        post(Component.literal(ChatglotConstants.INTERNAL_PREFIX + " " + message).withStyle(ChatFormatting.GRAY));
     }
 
-    public static void post(Text text) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.inGameHud == null) {
+    public static void post(Component text) {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.gui == null) {
             return;
         }
 
-        client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> client.inGameHud.getChatHud().addMessage(text)));
+        client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> client.gui.getChat().addClientSystemMessage(text)));
     }
 
-    private static void postTranslation(Text translatedText, String originalText, MessageSignatureData originalSignature) {
-        MinecraftClient client = MinecraftClient.getInstance();
-        if (client == null || client.inGameHud == null) {
+    private static void postTranslation(Component translatedText, String originalText, MessageSignature originalSignature) {
+        Minecraft client = Minecraft.getInstance();
+        if (client == null || client.gui == null) {
             return;
         }
 
         client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> {
-            ChatHud chatHud = client.inGameHud.getChatHud();
+            ChatComponent chatHud = client.gui.getChat();
             ChatglotConfig config = ChatglotRuntime.get().configManager().get();
             boolean replaced = false;
             if (config.overwriteOriginalWithTranslation) {
@@ -75,23 +75,23 @@ public final class ChatOutput {
                 );
             }
             if (!replaced) {
-                chatHud.addMessage(translatedText);
+                chatHud.addClientSystemMessage(translatedText);
             }
         }));
     }
 
     private static boolean replaceOriginalMessage(
-        ChatHud chatHud,
-        Text translatedText,
+        ChatComponent chatHud,
+        Component translatedText,
         String originalText,
-        MessageSignatureData originalSignature,
+        MessageSignature originalSignature,
         String buttonLabel
     ) {
         if (!(chatHud instanceof ChatHudAccessor accessor)) {
             return false;
         }
 
-        List<ChatHudLine> messages = accessor.chatglot$getMessages();
+        List<GuiMessage> messages = accessor.chatglot$getMessages();
         if (messages.isEmpty()) {
             return false;
         }
@@ -101,19 +101,25 @@ public final class ChatOutput {
             return false;
         }
 
-        ChatHudLine originalLine = messages.get(targetIndex);
+        GuiMessage originalLine = messages.get(targetIndex);
         messages.set(
             targetIndex,
-            new ChatHudLine(originalLine.creationTick(), translatedText, null, originalLine.indicator())
+            new GuiMessage(
+                originalLine.addedTime(),
+                translatedText,
+                originalLine.signature(),
+                originalLine.source(),
+                originalLine.tag()
+            )
         );
         accessor.chatglot$invokeRefresh();
         return true;
     }
 
     private static int findLatestMatchingMessageIndex(
-        List<ChatHudLine> messages,
+        List<GuiMessage> messages,
         String originalText,
-        MessageSignatureData originalSignature,
+        MessageSignature originalSignature,
         String buttonLabel
     ) {
         int bySignature = findLatestBySignature(messages, originalSignature);
@@ -127,7 +133,7 @@ public final class ChatOutput {
         return findLatestByOriginalText(messages, originalText, buttonLabel);
     }
 
-    private static int findLatestBySignature(List<ChatHudLine> messages, MessageSignatureData originalSignature) {
+    private static int findLatestBySignature(List<GuiMessage> messages, MessageSignature originalSignature) {
         if (originalSignature == null) {
             return -1;
         }
@@ -135,31 +141,31 @@ public final class ChatOutput {
         int selectedIndex = -1;
         int latestCreationTick = Integer.MIN_VALUE;
         for (int i = 0; i < messages.size(); i++) {
-            ChatHudLine line = messages.get(i);
+            GuiMessage line = messages.get(i);
             if (!originalSignature.equals(line.signature())) {
                 continue;
             }
 
-            if (line.creationTick() > latestCreationTick) {
-                latestCreationTick = line.creationTick();
+            if (line.addedTime() > latestCreationTick) {
+                latestCreationTick = line.addedTime();
                 selectedIndex = i;
             }
         }
         return selectedIndex;
     }
 
-    private static int findLatestByOriginalText(List<ChatHudLine> messages, String originalText, String buttonLabel) {
+    private static int findLatestByOriginalText(List<GuiMessage> messages, String originalText, String buttonLabel) {
         int selectedIndex = -1;
         int latestCreationTick = Integer.MIN_VALUE;
         for (int i = 0; i < messages.size(); i++) {
-            ChatHudLine line = messages.get(i);
+            GuiMessage line = messages.get(i);
             String content = line.content().getString();
             if (!matchesOriginal(content, originalText, buttonLabel)) {
                 continue;
             }
 
-            if (line.creationTick() > latestCreationTick) {
-                latestCreationTick = line.creationTick();
+            if (line.addedTime() > latestCreationTick) {
+                latestCreationTick = line.addedTime();
                 selectedIndex = i;
             }
         }

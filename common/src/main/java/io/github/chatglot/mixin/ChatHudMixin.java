@@ -8,33 +8,33 @@ import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.client.gui.hud.ChatHud;
-import net.minecraft.client.gui.hud.MessageIndicator;
-import net.minecraft.network.message.MessageSignatureData;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
-import net.minecraft.text.MutableText;
-import net.minecraft.text.Style;
-import net.minecraft.text.Text;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MessageSignature;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(ChatHud.class)
+@Mixin(ChatComponent.class)
 public abstract class ChatHudMixin {
     @ModifyVariable(
-        method = "addMessage(Lnet/minecraft/text/Text;Lnet/minecraft/network/message/MessageSignatureData;Lnet/minecraft/client/gui/hud/MessageIndicator;)V",
+        method = "addPlayerMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
         at = @At("HEAD"),
         argsOnly = true
     )
-    private Text chatglot$appendTranslateButton(
-        Text message,
-        Text originalMessage,
-        MessageSignatureData signature,
-        MessageIndicator indicator
+    private Component chatglot$appendTranslateButton(
+        Component message,
+        Component originalMessage,
+        MessageSignature signature,
+        GuiMessageTag indicator
     ) {
         if (!ChatglotRuntime.isInitialized() || ChatMessagePipelineGuard.isSuppressed()) {
             return message;
@@ -51,22 +51,22 @@ public abstract class ChatHudMixin {
         }
 
         int id = ChatglotRuntime.get().requestStore().register(plain, message, signature);
-        MutableText button = Text.literal(" " + config.translateButtonLabel)
+        MutableComponent button = Component.literal(" " + config.translateButtonLabel)
             .setStyle(
                 Style.EMPTY
-                    .withColor(Formatting.AQUA)
+                    .withColor(ChatFormatting.AQUA)
                     .withClickEvent(new ClickEvent.RunCommand("/chatglot translate " + id))
-                    .withHoverEvent(new HoverEvent.ShowText(Text.translatable("chatglot.translate_button.hover")))
+                    .withHoverEvent(new HoverEvent.ShowText(Component.translatable("chatglot.translate_button.hover")))
             );
 
-        return Text.empty().append(message.copy()).append(button);
+        return Component.empty().append(message.copy()).append(button);
     }
 
     @Inject(
-        method = "addMessage(Lnet/minecraft/text/Text;Lnet/minecraft/network/message/MessageSignatureData;Lnet/minecraft/client/gui/hud/MessageIndicator;)V",
+        method = "addPlayerMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
         at = @At("TAIL")
     )
-    private void chatglot$autoTranslate(Text message, MessageSignatureData signature, MessageIndicator indicator, CallbackInfo ci) {
+    private void chatglot$autoTranslate(Component message, MessageSignature signature, GuiMessageTag indicator, CallbackInfo ci) {
         if (!ChatglotRuntime.isInitialized() || ChatMessagePipelineGuard.isSuppressed()) {
             return;
         }
@@ -77,7 +77,7 @@ public abstract class ChatHudMixin {
             return;
         }
 
-        Text originalMessage = stripTranslateButton(message, config.translateButtonLabel);
+        Component originalMessage = stripTranslateButton(message, config.translateButtonLabel);
         String plain = originalMessage == null ? stripTranslateButtonSuffix(message.getString(), config.translateButtonLabel) : originalMessage.getString();
         if (plain.isBlank() || plain.startsWith(ChatglotConstants.INTERNAL_PREFIX)) {
             return;
@@ -99,17 +99,17 @@ public abstract class ChatHudMixin {
             });
     }
 
-    private static Text stripTranslateButton(Text message, String buttonLabel) {
+    private static Component stripTranslateButton(Component message, String buttonLabel) {
         if (message == null) {
             return null;
         }
 
-        MutableText copy = message.copy();
+        MutableComponent copy = message.copy();
         if (copy.getSiblings().isEmpty()) {
             return copy;
         }
 
-        Text lastSibling = copy.getSiblings().get(copy.getSiblings().size() - 1);
+        Component lastSibling = copy.getSiblings().get(copy.getSiblings().size() - 1);
         if (!isTranslateButton(lastSibling, buttonLabel)) {
             return copy;
         }
@@ -118,7 +118,7 @@ public abstract class ChatHudMixin {
         return copy;
     }
 
-    private static boolean isTranslateButton(Text text, String buttonLabel) {
+    private static boolean isTranslateButton(Component text, String buttonLabel) {
         if (text == null || buttonLabel == null || buttonLabel.isBlank()) {
             return false;
         }

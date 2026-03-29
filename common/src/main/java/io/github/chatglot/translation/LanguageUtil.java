@@ -1,8 +1,8 @@
 package io.github.chatglot.translation;
 
 import java.util.Set;
+import net.minecraft.client.Minecraft;
 import java.util.Locale;
-import net.minecraft.client.MinecraftClient;
 
 public final class LanguageUtil {
     public static final String MINECRAFT_DEFAULT_TARGET = "MINECRAFT_DEFAULT";
@@ -62,9 +62,9 @@ public final class LanguageUtil {
 
     public static String resolveConfiguredTargetLanguage(String configuredTargetLanguage) {
         if (isMinecraftDefaultTarget(configuredTargetLanguage)) {
-            MinecraftClient client = MinecraftClient.getInstance();
+            Minecraft client = Minecraft.getInstance();
             if (client != null && client.getLanguageManager() != null) {
-                String currentLanguageCode = client.getLanguageManager().getLanguage();
+                String currentLanguageCode = client.getLanguageManager().getSelected();
                 String resolvedCurrent = normalizeTargetLanguage(currentLanguageCode);
                 if (!resolvedCurrent.isBlank()) {
                     return resolvedCurrent;

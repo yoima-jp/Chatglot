@@ -361,7 +361,7 @@ public final class CodexOAuthService {
         }
 
         try {
-            Util.getOperatingSystem().open(url);
+            Util.getPlatform().openUri(url);
             return;
         } catch (Exception e) {
             if (desktopFailure != null) {

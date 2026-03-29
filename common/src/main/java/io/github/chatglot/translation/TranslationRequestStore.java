@@ -7,8 +7,8 @@ import java.util.Deque;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
-import net.minecraft.network.message.MessageSignatureData;
-import net.minecraft.text.Text;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MessageSignature;
 
 public final class TranslationRequestStore {
     private final AtomicInteger idSequence = new AtomicInteger(0);
@@ -19,11 +19,11 @@ public final class TranslationRequestStore {
         return register(originalText, null, null);
     }
 
-    public synchronized int register(String originalText, MessageSignatureData signature) {
+    public synchronized int register(String originalText, MessageSignature signature) {
         return register(originalText, null, signature);
     }
 
-    public synchronized int register(String originalText, Text originalMessage, MessageSignatureData signature) {
+    public synchronized int register(String originalText, Component originalMessage, MessageSignature signature) {
         int id = idSequence.updateAndGet(prev -> prev >= 999_999 ? 1 : prev + 1);
         requests.put(
             id,
@@ -54,8 +54,8 @@ public final class TranslationRequestStore {
     public record StoredRequest(
         int id,
         String originalText,
-        Text originalMessage,
-        MessageSignatureData signature,
+        Component originalMessage,
+        MessageSignature signature,
         long createdAtMillis
     ) {
     }

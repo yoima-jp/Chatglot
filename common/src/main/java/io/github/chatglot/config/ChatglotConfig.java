@@ -123,6 +123,17 @@ public class ChatglotConfig {
             return;
         }
 
+        enabled = other.enabled;
+        appendTranslateButton = other.appendTranslateButton;
+        translateButtonLabel = other.translateButtonLabel;
+        autoTranslateEnabled = other.autoTranslateEnabled;
+        autoTranslateEnabledWhenSupported = other.autoTranslateEnabledWhenSupported;
+        overwriteOriginalWithTranslation = other.overwriteOriginalWithTranslation;
+        showTranslationPrefix = other.showTranslationPrefix;
+        preserveLeadingSpeakerPrefix = other.preserveLeadingSpeakerPrefix;
+        targetLanguage = other.targetLanguage;
+        showSourceLanguageTag = other.showSourceLanguageTag;
+        provider = other.provider;
         deeplApiKey = other.deeplApiKey;
         deeplUseFreeApi = other.deeplUseFreeApi;
         googleTranslateApiKey = other.googleTranslateApiKey;
@@ -148,6 +159,8 @@ public class ChatglotConfig {
         localModelAlias = other.localModelAlias;
         localModelFileName = other.localModelFileName;
         localModelDownloadUrl = other.localModelDownloadUrl;
+        requestTimeoutSeconds = other.requestTimeoutSeconds;
+        maxConcurrentTranslations = other.maxConcurrentTranslations;
     }
 
     public ChatglotConfig extractSharedSettings() {
@@ -158,31 +171,9 @@ public class ChatglotConfig {
     }
 
     public void clearSharedSettings() {
-        deeplApiKey = "";
-        deeplUseFreeApi = true;
-        googleTranslateApiKey = "";
-        gasWebAppUrl = "";
-        codexTokenFile = "";
-        codexModel = CODEX_DEFAULT_MODEL;
-        codexReasoningEffort = CODEX_REASONING_EFFORT_MEDIUM;
-        codexReasoningSummary = "auto";
-        openaiApiKey = "";
-        openaiModel = OPENAI_DEFAULT_MODEL;
-        geminiApiKey = "";
-        geminiModel = GEMINI_DEFAULT_MODEL;
-        anthropicApiKey = "";
-        anthropicModel = ANTHROPIC_DEFAULT_MODEL;
-        azureTranslatorApiKey = "";
-        azureTranslatorRegion = "";
-        azureTranslatorEndpoint = AZURE_TRANSLATOR_DEFAULT_ENDPOINT;
-        localBackendBaseUrl = "";
-        localBackendPort = LOCAL_BACKEND_DEFAULT_PORT;
-        localBackendSharedDirectory = "";
-        localBackendCommand = "";
-        localModelPath = "";
-        localModelAlias = LOCAL_BACKEND_DEFAULT_MODEL_ALIAS;
-        localModelFileName = LOCAL_BACKEND_DEFAULT_MODEL_FILE_NAME;
-        localModelDownloadUrl = LOCAL_BACKEND_DEFAULT_MODEL_URL;
+        boolean useShared = useSharedAppDataSettings;
+        applySharedSettingsFrom(new ChatglotConfig());
+        useSharedAppDataSettings = useShared;
     }
 
     public static String normalizeCodexReasoningEffort(String effort) {

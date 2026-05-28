@@ -63,12 +63,7 @@ public final class GasTranslationProvider implements TranslationProvider {
                 root = JsonParser.parseString(normalizedBody).getAsJsonObject();
             } catch (RuntimeException parseError) {
                 throw new TranslationException(
-                    "GAS returned non-JSON response ("
-                        + response.statusCode()
-                        + ", "
-                        + readContentType(response)
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(responseBody, 500),
+                    buildNonJsonResponseMessage(response, responseBody),
                     parseError
                 );
             }
@@ -170,6 +165,56 @@ public final class GasTranslationProvider implements TranslationProvider {
 
     private static String readContentType(HttpResponse<String> response) {
         return response.headers().firstValue("Content-Type").orElse("unknown");
+    }
+
+    private static String buildNonJsonResponseMessage(HttpResponse<String> response, String responseBody) {
+        String contentType = readContentType(response);
+        String details = TranslationPromptBuilder.abbreviate(responseBody, 500);
+        if (isHtmlResponse(contentType, responseBody)) {
+            String htmlText = extractHtmlText(responseBody);
+            if (!htmlText.isBlank()) {
+                details = TranslationPromptBuilder.abbreviate(htmlText, 500);
+            }
+            details = details
+                + " Check that the GAS Web App URL ends with /exec, the deployment is a Web app, "
+                + "Execute as is set to Me, Who has access is set to Anyone, and the script has been authorized.";
+        }
+
+        return "GAS returned non-JSON response ("
+            + response.statusCode()
+            + ", "
+            + contentType
+            + "): "
+            + details;
+    }
+
+    private static boolean isHtmlResponse(String contentType, String responseBody) {
+        if (contentType != null && contentType.toLowerCase(Locale.ROOT).contains("text/html")) {
+            return true;
+        }
+        if (responseBody == null) {
+            return false;
+        }
+        return responseBody.stripLeading().toLowerCase(Locale.ROOT).startsWith("<!doctype html")
+            || responseBody.stripLeading().toLowerCase(Locale.ROOT).startsWith("<html");
+    }
+
+    private static String extractHtmlText(String html) {
+        if (html == null || html.isBlank()) {
+            return "";
+        }
+
+        String text = html
+            .replaceAll("(?is)<script[^>]*>.*?</script>", " ")
+            .replaceAll("(?is)<style[^>]*>.*?</style>", " ")
+            .replaceAll("(?is)<[^>]+>", " ")
+            .replace("&nbsp;", " ")
+            .replace("&amp;", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'");
+        return text.replaceAll("\\s+", " ").trim();
     }
 
     private static String extractErrorMessage(JsonObject root) {

@@ -12,6 +12,15 @@ dependencies {
     implementation(project(':common')) { transitive = false }
 }
 
+loom {
+    mods {
+        chatglot {
+            sourceSet project(':common').sourceSets.main
+            sourceSet sourceSets.main
+        }
+    }
+}
+
 jar {
     from(project(':common').sourceSets.main.output)
 }

@@ -16,6 +16,7 @@ Client-side only. No server installation is required.
 - [Download on Modrinth](https://modrinth.com/mod/chatglot)
 - [Report issues on GitHub](https://github.com/yoima-jp/Chatglot/issues/new/choose)
 - [View source on GitHub](https://github.com/yoima-jp/Chatglot)
+- [Project roadmap](ROADMAP.md)
 
 ---
 

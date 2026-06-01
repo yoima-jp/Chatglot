@@ -1,11 +1,35 @@
 # Chatglot
+
+[![Modrinth Downloads](https://img.shields.io/modrinth/dt/chatglot?logo=modrinth&label=Modrinth%20downloads)](https://modrinth.com/mod/chatglot)
+[![Modrinth Version](https://img.shields.io/modrinth/v/chatglot?logo=modrinth&label=Latest%20Modrinth%20release)](https://modrinth.com/mod/chatglot/versions)
+[![License: MIT](https://img.shields.io/github/license/yoima-jp/Chatglot)](LICENSE)
+[![Minecraft](https://img.shields.io/badge/Minecraft-26.1.x%20%7C%201.21.x-2ea043)](https://modrinth.com/mod/chatglot/versions)
+
 ![Chat translation examples](https://cdn.modrinth.com/data/cached_images/7225369d145f4b9bd970aa38485f37cbfe4782c3.png)
 **Chatglot** is a Fabric client-side mod that translates Minecraft chat messages on the fly.  
 A translate button (`✍` by default) is added to each chat message. Click it, or let auto-translate handle it, and the translated result is shown in chat either as a new line or by replacing the original message.
 
 Client-side only. No server installation is required.
 
+## Distribution
+
+- [Download on Modrinth](https://modrinth.com/mod/chatglot)
+- [Report issues on GitHub](https://github.com/yoima-jp/Chatglot/issues/new/choose)
+- [View source on GitHub](https://github.com/yoima-jp/Chatglot)
+
 ---
+
+## Why Chatglot Matters
+
+Minecraft servers often bring together players who do not share a common language. Chatglot helps those communities communicate by making chat translation available as a client-side Fabric mod, so servers do not need to install or trust a server-side plugin.
+
+The project focuses on practical choice and transparency:
+
+- Multiple translation providers so users can choose by cost, privacy, quality, and availability
+- A local TranslateGemma backend option for users who prefer local inference
+- Clear privacy notes for every provider that can receive chat text
+- Compatibility maintenance for current Minecraft and Fabric versions
+- Public distribution through Modrinth with source, issue reporting, and MIT licensing
 
 ## Features
 

@@ -161,5 +161,8 @@
   "chatglot.local_backend.progress.download_percent": "%s: %s (%s / %s)",
   "chatglot.local_backend.progress.download_bytes": "%s: %s",
   "chatglot.local_backend.action_started": "%s started...",
-  "chatglot.local_backend.action_failed": "%s failed: %s"
+  "chatglot.local_backend.action_failed": "%s failed: %s",
+  "chatglot.local_backend.backend_not_reachable_with_error": "Backend is not reachable. %s Model: %s (%s)",
+  "chatglot.local_backend.backend_started_healthcheck_failed_with_error": "Backend started but health check failed: %s Log: %s",
+  "chatglot.config.local_backend_open_log": "Open log file"
 }

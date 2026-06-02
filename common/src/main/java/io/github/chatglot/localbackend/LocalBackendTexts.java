@@ -26,6 +26,10 @@ public final class LocalBackendTexts {
         return Component.translatable("chatglot.local_backend.backend_not_reachable", runtimeMessage, modelPath);
     }
 
+    public static Component backendNotReachableWithError(Component runtimeMessage, String modelPath, String error) {
+        return Component.translatable("chatglot.local_backend.backend_not_reachable_with_error", runtimeMessage, modelPath, error);
+    }
+
     public static Component preparingFolders() {
         return Component.translatable("chatglot.local_backend.progress.preparing_folders");
     }
@@ -60,6 +64,10 @@ public final class LocalBackendTexts {
 
     public static Component backendStartedHealthCheckFailed(String logFile) {
         return Component.translatable("chatglot.local_backend.backend_started_healthcheck_failed", logFile);
+    }
+
+    public static Component backendStartedHealthCheckFailed(String logFile, String errorDetail) {
+        return Component.translatable("chatglot.local_backend.backend_started_healthcheck_failed_with_error", logFile, errorDetail);
     }
 
     public static Component backendStartFailed(String error) {

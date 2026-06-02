@@ -775,6 +775,12 @@ function jsonResponse(obj) {
                 () -> checkLocalBackendStatus(runtime, config, parent)
             )
         );
+        category.addEntry(
+            new CodexAuthButtonEntry(
+                Component.translatable("chatglot.config.local_backend_open_log"),
+                () -> openLocalBackendLog(config)
+            )
+        );
         category.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_advanced_notice")).build());
         return builder.build();
     }
@@ -1024,6 +1030,21 @@ function jsonResponse(obj) {
 
     private static void checkLocalBackendStatus(ChatglotRuntime runtime, ChatglotConfig config, Screen parent) {
         runLocalBackendAction(runtime, config, parent, progress -> runtime.localBackendManager().checkStatus(config), "status", false);
+    }
+
+    private static void openLocalBackendLog(ChatglotConfig config) {
+        try {
+            Path logFile = LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config, ChatglotRuntime.get().configDir()));
+            java.nio.file.Files.createDirectories(logFile.getParent());
+            Util.getPlatform().openUri(logFile.toUri());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to open local backend log: {}", e.getMessage());
+            if (Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.sendSystemMessage(
+                    Component.translatable("chatglot.config.local_backend_status_message",
+                        Component.literal("Failed to open log: " + e.getMessage())));
+            }
+        }
     }
 
     private interface LocalBackendAction {

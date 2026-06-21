@@ -64,7 +64,7 @@ public final class ChatglotClientCommands {
 
     private static int openConfig(FabricClientCommandSource source) {
         Minecraft client = Minecraft.getInstance();
-        client.execute(() -> client.setScreen(ChatglotConfigScreenFactory.create(client.screen)));
+        client.execute(() -> client.gui.setScreen(ChatglotConfigScreenFactory.create(client.gui.screen())));
         source.sendFeedback(Component.translatable("chatglot.command.config.opened").withStyle(ChatFormatting.GRAY));
         return 1;
     }

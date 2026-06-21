@@ -47,7 +47,7 @@ public final class ChatglotFabricClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openConfigKey.consumeClick()) {
-                client.setScreen(ChatglotConfigScreenFactory.create(client.screen));
+                client.gui.setScreen(ChatglotConfigScreenFactory.create(client.gui.screen()));
             }
         });
     }

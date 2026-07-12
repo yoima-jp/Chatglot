@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.ChatComponent;
+import net.minecraft.client.multiplayer.chat.GuiMessageSource;
 import net.minecraft.client.multiplayer.chat.GuiMessageTag;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -26,7 +27,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ChatComponent.class)
 public abstract class ChatHudMixin {
     @ModifyVariable(
-        method = "addPlayerMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
+        method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
         at = @At("HEAD"),
         argsOnly = true
     )
@@ -34,8 +35,13 @@ public abstract class ChatHudMixin {
         Component message,
         Component originalMessage,
         MessageSignature signature,
+        GuiMessageSource source,
         GuiMessageTag indicator
     ) {
+        if (source == GuiMessageSource.SYSTEM_CLIENT) {
+            return message;
+        }
+
         if (!ChatglotRuntime.isInitialized() || ChatMessagePipelineGuard.isSuppressed()) {
             return message;
         }
@@ -63,10 +69,14 @@ public abstract class ChatHudMixin {
     }
 
     @Inject(
-        method = "addPlayerMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
+        method = "addMessage(Lnet/minecraft/network/chat/Component;Lnet/minecraft/network/chat/MessageSignature;Lnet/minecraft/client/multiplayer/chat/GuiMessageSource;Lnet/minecraft/client/multiplayer/chat/GuiMessageTag;)V",
         at = @At("TAIL")
     )
-    private void chatglot$autoTranslate(Component message, MessageSignature signature, GuiMessageTag indicator, CallbackInfo ci) {
+    private void chatglot$autoTranslate(Component message, MessageSignature signature, GuiMessageSource source, GuiMessageTag indicator, CallbackInfo ci) {
+        if (source == GuiMessageSource.SYSTEM_CLIENT) {
+            return;
+        }
+
         if (!ChatglotRuntime.isInitialized() || ChatMessagePipelineGuard.isSuppressed()) {
             return;
         }

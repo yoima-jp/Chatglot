@@ -4,7 +4,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import java.net.ConnectException;
 import java.net.URI;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -12,13 +14,19 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class LocalBackendHealthChecker {
+    private static final Logger LOGGER = LoggerFactory.getLogger("Chatglot/HealthCheck");
+
     private final HttpClient httpClient = HttpClient.newHttpClient();
+    private volatile String lastError = "";
 
     public boolean isHealthy(String baseUrl, int timeoutSeconds) {
         Duration timeout = Duration.ofSeconds(Math.max(1, timeoutSeconds));
-        return fetchModelNames(baseUrl, timeout) != null;
+        Set<String> names = fetchModelNames(baseUrl, timeout);
+        return names != null;
     }
 
     public boolean hasModel(String baseUrl, String modelName, int timeoutSeconds) {
@@ -37,6 +45,10 @@ public final class LocalBackendHealthChecker {
         return false;
     }
 
+    public String getLastError() {
+        return lastError;
+    }
+
     private Set<String> fetchModelNames(String baseUrl, Duration timeout) {
         Set<String> names = fetchTags(baseUrl + "/api/tags", timeout);
         if (names != null) {
@@ -50,9 +62,12 @@ public final class LocalBackendHealthChecker {
             HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint)).timeout(timeout).GET().build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                lastError = "GET " + endpoint + " returned HTTP " + response.statusCode();
+                LOGGER.warn("Health check failed: {}", lastError);
                 return null;
             }
 
+            lastError = "";
             JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
             JsonArray models = root.getAsJsonArray("models");
             if (models == null) {
@@ -70,7 +85,17 @@ public final class LocalBackendHealthChecker {
                 }
             }
             return names;
+        } catch (HttpConnectTimeoutException e) {
+            lastError = "Connection timed out: " + endpoint;
+            LOGGER.warn("Health check failed: {}", lastError);
+            return null;
+        } catch (ConnectException e) {
+            lastError = "Connection refused: " + endpoint;
+            LOGGER.warn("Health check failed: {}", lastError);
+            return null;
         } catch (Exception e) {
+            lastError = e.getClass().getSimpleName() + ": " + e.getMessage() + " (endpoint: " + endpoint + ")";
+            LOGGER.warn("Health check failed: {}", lastError, e);
             return null;
         }
     }
@@ -80,9 +105,12 @@ public final class LocalBackendHealthChecker {
             HttpRequest request = HttpRequest.newBuilder(URI.create(endpoint)).timeout(timeout).GET().build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                lastError = "GET " + endpoint + " returned HTTP " + response.statusCode();
+                LOGGER.warn("Health check failed: {}", lastError);
                 return null;
             }
 
+            lastError = "";
             JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
             JsonArray models = root.getAsJsonArray("data");
             if (models == null) {
@@ -100,7 +128,17 @@ public final class LocalBackendHealthChecker {
                 }
             }
             return names;
+        } catch (HttpConnectTimeoutException e) {
+            lastError = "Connection timed out: " + endpoint;
+            LOGGER.warn("Health check failed: {}", lastError);
+            return null;
+        } catch (ConnectException e) {
+            lastError = "Connection refused: " + endpoint;
+            LOGGER.warn("Health check failed: {}", lastError);
+            return null;
         } catch (Exception e) {
+            lastError = e.getClass().getSimpleName() + ": " + e.getMessage() + " (endpoint: " + endpoint + ")";
+            LOGGER.warn("Health check failed: {}", lastError, e);
             return null;
         }
     }

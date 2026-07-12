@@ -70,6 +70,7 @@ public final class LocalBackendManager {
         boolean running = isProcessAlive(state.pid);
         boolean modelPresent = Files.exists(modelPath);
         Component runtimeMessage = resolveRuntimeMessage(config, sharedRoot);
+        String healthError = healthChecker.getLastError();
         Component message;
         if (healthy) {
             message = LocalBackendTexts.backendHealthy(runtimeMessage, modelPath.toString());
@@ -78,7 +79,7 @@ public final class LocalBackendManager {
         } else if (!modelPresent) {
             message = LocalBackendTexts.backendNotReachableMissingModel(runtimeMessage, modelPath.toString());
         } else {
-            message = LocalBackendTexts.backendNotReachable(runtimeMessage, modelPath.toString());
+            message = LocalBackendTexts.backendNotReachableWithError(runtimeMessage, modelPath.toString(), healthError);
         }
         return new LocalBackendStatus("status", true, healthy, running, baseUrl, sharedRoot, modelPath.toString(), message);
     }
@@ -176,11 +177,13 @@ public final class LocalBackendManager {
         }
 
         progressListener.accept(LocalBackendTexts.startingServer());
+        LOGGER.info("Starting backend process: {}", String.join(" ", desiredCommand));
         ProcessBuilder processBuilder = new ProcessBuilder(desiredCommand);
         processBuilder.directory(sharedRoot.toFile());
         processBuilder.redirectErrorStream(true);
         processBuilder.redirectOutput(ProcessBuilder.Redirect.appendTo(LocalBackendPaths.logFile(sharedRoot).toFile()));
         Process process = processBuilder.start();
+        LOGGER.info("Backend process started with PID: {}", process.pid());
         state.pid = process.pid();
         state.ownerPid = ProcessHandle.current().pid();
         state.watcherPid = startWatcher(state.ownerPid, state.pid);
@@ -205,7 +208,12 @@ public final class LocalBackendManager {
             }
         }
 
-        return new LocalBackendStatus("backend_healthcheck_failed", true, false, process.isAlive(), baseUrl, sharedRoot, modelPath.toString(), LocalBackendTexts.backendStartedHealthCheckFailed(LocalBackendPaths.logFile(sharedRoot).toString()));
+        String healthError = healthChecker.getLastError();
+        if (healthError.isEmpty()) {
+            healthError = "Unknown (process alive=" + process.isAlive() + ")";
+        }
+        LOGGER.warn("Backend health check failed after startup. Error: {}. Log: {}", healthError, LocalBackendPaths.logFile(sharedRoot));
+        return new LocalBackendStatus("backend_healthcheck_failed", true, false, process.isAlive(), baseUrl, sharedRoot, modelPath.toString(), LocalBackendTexts.backendStartedHealthCheckFailed(LocalBackendPaths.logFile(sharedRoot).toString(), healthError));
     }
 
     public LocalBackendStatus ensureBackendAvailable(ChatglotConfig config) {

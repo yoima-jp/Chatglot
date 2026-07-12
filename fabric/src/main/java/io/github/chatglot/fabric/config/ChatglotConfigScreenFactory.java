@@ -617,7 +617,7 @@ function jsonResponse(obj) {
         localGemma.addEntry(
             new CodexAuthButtonEntry(
                 Component.translatable("chatglot.config.local_backend_advanced"),
-                () -> Minecraft.getInstance().setScreen(createLocalBackendAdvancedScreen(create(parent)))
+                () -> Minecraft.getInstance().gui.setScreen(createLocalBackendAdvancedScreen(create(parent)))
             )
         );
         localGemma.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_windows_only")).build());
@@ -775,6 +775,12 @@ function jsonResponse(obj) {
                 () -> checkLocalBackendStatus(runtime, config, parent)
             )
         );
+        category.addEntry(
+            new CodexAuthButtonEntry(
+                Component.translatable("chatglot.config.local_backend_open_log"),
+                () -> openLocalBackendLog(config)
+            )
+        );
         category.addEntry(entryBuilder.startTextDescription(Component.translatable("chatglot.config.local_backend_advanced_notice")).build());
         return builder.build();
     }
@@ -859,7 +865,7 @@ function jsonResponse(obj) {
                 client.player.sendSystemMessage(
                     Component.translatable("chatglot.config.codex_model_refresh.success", Integer.toString(refreshed.size())));
             }
-            client.setScreen(create(parent));
+            client.gui.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh Codex model list: {}", e.getMessage());
             if (client.player != null) {
@@ -891,7 +897,7 @@ function jsonResponse(obj) {
                         client.player.sendSystemMessage(
                             Component.translatable("chatglot.config.codex_auth_start.success", tokenFile.toString()));
                     }
-                    client.setScreen(create(parent));
+                    client.gui.setScreen(create(parent));
                 });
             } catch (Exception e) {
                 LOGGER.warn("Failed to complete Codex OAuth flow: {}", e.getMessage());
@@ -926,7 +932,7 @@ function jsonResponse(obj) {
                 client.player.sendSystemMessage(
                     Component.translatable("chatglot.config.openai_model_refresh.success", Integer.toString(refreshed.size())));
             }
-            client.setScreen(create(parent));
+            client.gui.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh OpenAI model list: {}", e.getMessage());
             if (client.player != null) {
@@ -945,7 +951,7 @@ function jsonResponse(obj) {
                 client.player.sendSystemMessage(
                     Component.translatable("chatglot.config.gemini_model_refresh.success", Integer.toString(refreshed.size())));
             }
-            client.setScreen(create(parent));
+            client.gui.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh Gemini model list: {}", e.getMessage());
             if (client.player != null) {
@@ -967,7 +973,7 @@ function jsonResponse(obj) {
                 client.player.sendSystemMessage(
                     Component.translatable("chatglot.config.anthropic_model_refresh.success", Integer.toString(refreshed.size())));
             }
-            client.setScreen(create(parent));
+            client.gui.setScreen(create(parent));
         } catch (Exception e) {
             LOGGER.warn("Failed to refresh Anthropic model list: {}", e.getMessage());
             if (client.player != null) {
@@ -1026,6 +1032,21 @@ function jsonResponse(obj) {
         runLocalBackendAction(runtime, config, parent, progress -> runtime.localBackendManager().checkStatus(config), "status", false);
     }
 
+    private static void openLocalBackendLog(ChatglotConfig config) {
+        try {
+            Path logFile = LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config, ChatglotRuntime.get().configDir()));
+            java.nio.file.Files.createDirectories(logFile.getParent());
+            Util.getPlatform().openUri(logFile.toUri());
+        } catch (Exception e) {
+            LOGGER.warn("Failed to open local backend log: {}", e.getMessage());
+            if (Minecraft.getInstance().player != null) {
+                Minecraft.getInstance().player.sendSystemMessage(
+                    Component.translatable("chatglot.config.local_backend_status_message",
+                        Component.literal("Failed to open log: " + e.getMessage())));
+            }
+        }
+    }
+
     private interface LocalBackendAction {
         LocalBackendStatus run(java.util.function.Consumer<Component> progressListener) throws Exception;
     }
@@ -1065,7 +1086,7 @@ function jsonResponse(obj) {
                             Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage));
                     }
                     if (parent != null) {
-                        client.setScreen(create(parent));
+                        client.gui.setScreen(create(parent));
                     }
                 });
             } catch (Exception e) {
@@ -1080,7 +1101,7 @@ function jsonResponse(obj) {
                             Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage));
                     }
                     if (parent != null) {
-                        client.setScreen(create(parent));
+                        client.gui.setScreen(create(parent));
                     }
                 });
             }
@@ -1116,8 +1137,8 @@ function jsonResponse(obj) {
                 client.player.sendSystemMessage(
                     Component.translatable("chatglot.config.local_backend_status_message", localBackendStatusMessage));
             }
-            if (parent != null && client.screen != null) {
-                client.setScreen(create(parent));
+            if (parent != null && client.gui.screen() != null) {
+                client.gui.setScreen(create(parent));
             }
         });
     }

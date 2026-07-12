@@ -52,7 +52,7 @@ public final class ChatOutput {
             return;
         }
 
-        client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> client.gui.getChat().addClientSystemMessage(text)));
+        client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> client.gui.hud.getChat().addClientSystemMessage(text)));
     }
 
     private static void postTranslation(Component translatedText, String originalText, MessageSignature originalSignature) {
@@ -62,7 +62,7 @@ public final class ChatOutput {
         }
 
         client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> {
-            ChatComponent chatHud = client.gui.getChat();
+            ChatComponent chatHud = client.gui.hud.getChat();
             ChatglotConfig config = ChatglotRuntime.get().configManager().get();
             boolean replaced = false;
             if (config.overwriteOriginalWithTranslation) {

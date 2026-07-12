@@ -21,8 +21,11 @@ import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import net.minecraft.network.chat.Component;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class LocalBackendInstaller {
+    private static final Logger LOGGER = LoggerFactory.getLogger("Chatglot/LocalBackendInstaller");
     private static final String LLAMA_CPP_RELEASE_API_URL = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
     private static final String WINDOWS_CPU_ASSET_MARKER = "-bin-win-cpu-x64.zip";
 
@@ -65,17 +68,21 @@ public final class LocalBackendInstaller {
                 throw new IOException("Configured backend command was not found: " + override);
             }
             progressListener.accept(LocalBackendTexts.usingRuntimeOverride(override.toString()));
+            LOGGER.info("Using runtime override: {}", override);
             return override;
         }
 
         Path stagedRuntime = findManagedRuntime(sharedRoot);
         if (stagedRuntime != null) {
             progressListener.accept(LocalBackendTexts.usingManagedRuntime(stagedRuntime.toString()));
+            LOGGER.info("Using existing managed runtime: {}", stagedRuntime);
             return stagedRuntime;
         }
 
         progressListener.accept(LocalBackendTexts.downloadingManagedRuntime());
+        LOGGER.info("No managed runtime found, resolving latest llama.cpp release...");
         String assetUrl = resolveLatestWindowsCpuAssetUrl();
+        LOGGER.info("Downloading llama.cpp runtime from: {}", assetUrl);
         Path runtimeDir = LocalBackendPaths.runtimeDir(sharedRoot);
         Path dataDir = LocalBackendPaths.dataDir(sharedRoot);
         Files.createDirectories(runtimeDir);
@@ -85,13 +92,16 @@ public final class LocalBackendInstaller {
         Files.deleteIfExists(archivePath);
         downloadToFile(assetUrl, archivePath, Duration.ofMinutes(10), "Runtime download", progressListener);
 
+        LOGGER.info("Runtime download complete, extracting ZIP to {}", runtimeDir);
         clearRuntimeDirectory(runtimeDir);
         extractZip(archivePath, runtimeDir);
         Files.move(archivePath, finalArchivePath, StandardCopyOption.REPLACE_EXISTING);
+        LOGGER.info("ZIP extracted and archived to {}", finalArchivePath);
 
         stagedRuntime = findManagedRuntime(sharedRoot);
         if (stagedRuntime != null) {
             progressListener.accept(LocalBackendTexts.downloadedManagedRuntime(stagedRuntime.toString()));
+            LOGGER.info("Managed runtime ready: {}", stagedRuntime);
             return stagedRuntime;
         }
         throw new IOException("Downloaded llama.cpp runtime archive, but llama-server.exe was not found in " + runtimeDir);
@@ -106,6 +116,7 @@ public final class LocalBackendInstaller {
         Path modelPath = LocalBackendPaths.resolveModelPath(config, sharedRoot);
         if (Files.exists(modelPath) && Files.size(modelPath) > 0) {
             progressListener.accept(LocalBackendTexts.modelAlreadyPresent(modelPath.toString()));
+            LOGGER.info("Model already present: {} ({} bytes)", modelPath, Files.size(modelPath));
             return modelPath;
         }
         if (config.localModelDownloadUrl == null || config.localModelDownloadUrl.isBlank()) {
@@ -115,9 +126,11 @@ public final class LocalBackendInstaller {
         Files.createDirectories(modelPath.getParent());
         Path tempPath = modelPath.resolveSibling(modelPath.getFileName() + ".part");
         Files.deleteIfExists(tempPath);
-        progressListener.accept(LocalBackendTexts.downloadingModel(config.localModelDownloadUrl.trim()));
+        String downloadUrl = config.localModelDownloadUrl.trim();
+        progressListener.accept(LocalBackendTexts.downloadingModel(downloadUrl));
+        LOGGER.info("Downloading model from: {} to {}", downloadUrl, modelPath);
 
-        downloadToFile(config.localModelDownloadUrl.trim(), tempPath, Duration.ofMinutes(30), "Model download", progressListener);
+        downloadToFile(downloadUrl, tempPath, Duration.ofMinutes(30), "Model download", progressListener);
 
         try {
             Files.move(tempPath, modelPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
@@ -138,6 +151,7 @@ public final class LocalBackendInstaller {
     }
 
     private String resolveLatestWindowsCpuAssetUrl() throws IOException {
+        LOGGER.info("Querying latest llama.cpp release from GitHub API...");
         HttpRequest request = HttpRequest.newBuilder(URI.create(LLAMA_CPP_RELEASE_API_URL))
             .timeout(Duration.ofSeconds(30))
             .header("Accept", "application/vnd.github+json")
@@ -154,6 +168,7 @@ public final class LocalBackendInstaller {
         }
 
         if (response.statusCode() >= 400) {
+            LOGGER.warn("GitHub API returned HTTP {} for llama.cpp releases", response.statusCode());
             throw new IOException("Failed to resolve llama.cpp release asset: HTTP " + response.statusCode());
         }
 
@@ -175,7 +190,9 @@ public final class LocalBackendInstaller {
             if (!asset.has("browser_download_url")) {
                 continue;
             }
-            return asset.get("browser_download_url").getAsString();
+            String url = asset.get("browser_download_url").getAsString();
+            LOGGER.info("Found Windows CPU asset: {} -> {}", name, url);
+            return url;
         }
 
         throw new IOException("Could not find a Windows x64 CPU llama.cpp runtime asset in the latest release.");
@@ -197,13 +214,16 @@ public final class LocalBackendInstaller {
         try {
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
             if (response.statusCode() >= 400) {
+                LOGGER.warn("Download {} failed: HTTP {} from {}", progressLabel, response.statusCode(), url);
                 Files.deleteIfExists(destination);
                 throw new IOException(progressLabel + " failed with HTTP " + response.statusCode());
             }
             long contentLength = response.headers().firstValueAsLong("Content-Length").orElse(-1L);
+            LOGGER.info("Downloading {} ({} bytes) to {}", progressLabel, contentLength > 0 ? contentLength : "unknown", destination);
             try (InputStream input = response.body()) {
                 writeStreamToFile(input, destination, contentLength, progressLabel, progressListener);
             }
+            LOGGER.info("Download complete: {}", destination);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             Files.deleteIfExists(destination);
@@ -288,6 +308,7 @@ public final class LocalBackendInstaller {
     }
 
     private static void extractZip(Path archivePath, Path destinationDir) throws IOException {
+        int fileCount = 0;
         try (InputStream inputStream = Files.newInputStream(archivePath); ZipInputStream zip = new ZipInputStream(inputStream)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -303,8 +324,10 @@ public final class LocalBackendInstaller {
 
                 Files.createDirectories(output.getParent());
                 Files.copy(zip, output, StandardCopyOption.REPLACE_EXISTING);
+                fileCount++;
             }
         }
+        LOGGER.info("Extracted {} files from {} to {}", fileCount, archivePath.getFileName(), destinationDir);
     }
 
     public Path findManagedRuntime(Path sharedRoot) {

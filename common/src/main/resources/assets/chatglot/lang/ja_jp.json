@@ -161,5 +161,8 @@
   "chatglot.local_backend.progress.download_percent": "%s: %s (%s / %s)",
   "chatglot.local_backend.progress.download_bytes": "%s: %s",
   "chatglot.local_backend.action_started": "%s を開始しました...",
-  "chatglot.local_backend.action_failed": "%s に失敗しました: %s"
+  "chatglot.local_backend.action_failed": "%s に失敗しました: %s",
+  "chatglot.local_backend.backend_not_reachable_with_error": "バックエンドに接続できません。%s モデル: %s (%s)",
+  "chatglot.local_backend.backend_started_healthcheck_failed_with_error": "バックエンドは起動しましたが、ヘルスチェックに失敗しました: %s ログ: %s",
+  "chatglot.config.local_backend_open_log": "ログファイルを開く"
 }

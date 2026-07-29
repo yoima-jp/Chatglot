@@ -1,4 +1,21 @@
 dependencies {
     implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
     implementation "com.github.pemistahl:lingua:1.2.2"
+    // ModDeck API for declarative config screens. The common module only needs the API
+    // classes (ConfigDefinition, ConfigRegistry, options) which live in the shared ModDeck jar.
+    // The client-only classes such as screens and widgets are on the fabric module classpath
+    // through the :fabric dependency, but they are not referenced here.
+    implementation "com.yoima:moddeck:${rootProject.moddeck_version}"
+    // Fabric API is not part of the common classpath, so use a compile-only reference to
+    // the networking/attachment interfaces implemented by LocalPlayer. At runtime the
+    // Fabric loader will provide the actual classes.
+    compileOnly "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
+
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
 }

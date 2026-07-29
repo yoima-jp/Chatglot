@@ -47,7 +47,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 
 - [Fabric Loader](https://fabricmc.net/)
 - [Fabric API](https://modrinth.com/mod/fabric-api)
-- [Cloth Config](https://modrinth.com/mod/cloth-config) *(required for in-game settings)*
+- [ModDeck](https://modrinth.com/mod/moddeck) *(required for in-game settings)*
 - [ModMenu](https://modrinth.com/mod/modmenu) *(optional, recommended)*
 
 ---

@@ -52,7 +52,11 @@ public final class ChatOutput {
             return;
         }
 
-        client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> client.gui.hud.getChat().addClientSystemMessage(text)));
+        client.execute(() -> ChatMessagePipelineGuard.runSuppressed(() -> {
+            if (client.gui.hud != null && client.gui.hud.getChat() != null) {
+                client.gui.hud.getChat().addClientSystemMessage(text);
+            }
+        }));
     }
 
     private static void postTranslation(Component translatedText, String originalText, MessageSignature originalSignature) {

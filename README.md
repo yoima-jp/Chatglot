@@ -53,6 +53,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 | `deepl` | DeepL API key |
 | `google` | Google Cloud Translation API key |
 | `openai` | OpenAI API key |
+| `custom_llm` | Custom OpenResponses or Chat Completions API |
 | `gemini` | Gemini API key |
 | `anthropic` | Anthropic API key |
 | `azure` | Azure Translator API key + region |
@@ -75,7 +76,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 - Minecraft `26.1.2` (`26.1.x` compatible)
 - [Fabric Loader](https://fabricmc.net/)
 - [Fabric API](https://modrinth.com/mod/fabric-api)
-- [Cloth Config](https://modrinth.com/mod/cloth-config) *(required for in-game settings)*
+- [ModDeck](https://modrinth.com/mod/moddeck) *(required for in-game settings)*
 - [ModMenu](https://modrinth.com/mod/modmenu) *(optional, recommended)*
 
 ---
@@ -143,6 +144,7 @@ Shared settings are stored locally on your PC. They are not uploaded anywhere ju
 - **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`openai` provider**: Chat text is sent to the OpenAI API using your API key. See [OpenAI data controls](https://platform.openai.com/docs/guides/your-data/).
+- **`custom_llm` provider**: Chat text is sent to the custom Base URL that you configure. Select either OpenResponses (`/responses`) or Chat Completions (`/chat/completions`) format. The API key is optional for local servers.
 - **`codex` provider**: Uses browser-based OAuth, stores the token locally, and then uses that token to send chat text to OpenAI services. The mod also fetches the available model list from [`https://modelapi.yoima.com/api/codex-models/list`](https://modelapi.yoima.com/api/codex-models/list). No chat content is sent to that model-list endpoint.
 - **`gemini` provider**: Chat text is sent to the Gemini API. For Google AI Studio / Gemini API usage, review the provider terms here: [Gemini API Terms](https://ai.google.dev/gemini-api/terms).
 - **`deepl` provider**: Chat text is sent to the DeepL API. See [DeepL Privacy Policy](https://www.deepl.com/en/privacy.html).

@@ -11,7 +11,7 @@ Chatglot's main goal is to keep practical Minecraft chat translation available f
 
 ## Near Term
 
-- Refine compatibility updates for Minecraft, Fabric Loader, Fabric API, Cloth Config, and ModMenu.
+- Refine compatibility updates for Minecraft, Fabric Loader, Fabric API, ModDeck, and ModMenu.
 - Improve setup and recovery guidance for providers that require API keys or external services.
 - Continue improving the local TranslateGemma backend setup, health checks, logs, and failure messages.
 - Keep privacy and data-transmission notes accurate for every provider that can receive chat text.

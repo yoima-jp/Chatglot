@@ -10,6 +10,9 @@ public class ChatglotConfig {
         "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
     public static final String CODEX_DEFAULT_MODEL = "gpt-5.4-mini";
     public static final String OPENAI_DEFAULT_MODEL = "gpt-5-nano";
+    public static final String OPENAI_COMPATIBLE_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1";
+    public static final String OPENAI_COMPATIBLE_PROTOCOL_OPEN_RESPONSES = "openresponses";
+    public static final String OPENAI_COMPATIBLE_PROTOCOL_CHAT_COMPLETIONS = "chat_completions";
     public static final String GEMINI_DEFAULT_MODEL = "gemini-flash-latest";
     public static final String ANTHROPIC_DEFAULT_MODEL = "claude-haiku-4-5";
     public static final String AZURE_TRANSLATOR_DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com";
@@ -51,6 +54,11 @@ public class ChatglotConfig {
 
     public String openaiApiKey = "";
     public String openaiModel = OPENAI_DEFAULT_MODEL;
+
+    public String openaiCompatibleBaseUrl = OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
+    public String openaiCompatibleProtocol = OPENAI_COMPATIBLE_PROTOCOL_OPEN_RESPONSES;
+    public String openaiCompatibleApiKey = "";
+    public String openaiCompatibleModel = "";
 
     public String geminiApiKey = "";
     public String geminiModel = GEMINI_DEFAULT_MODEL;
@@ -98,6 +106,10 @@ public class ChatglotConfig {
         copy.codexReasoningSummary = codexReasoningSummary;
         copy.openaiApiKey = openaiApiKey;
         copy.openaiModel = openaiModel;
+        copy.openaiCompatibleBaseUrl = openaiCompatibleBaseUrl;
+        copy.openaiCompatibleProtocol = openaiCompatibleProtocol;
+        copy.openaiCompatibleApiKey = openaiCompatibleApiKey;
+        copy.openaiCompatibleModel = openaiCompatibleModel;
         copy.geminiApiKey = geminiApiKey;
         copy.geminiModel = geminiModel;
         copy.anthropicApiKey = anthropicApiKey;
@@ -144,6 +156,10 @@ public class ChatglotConfig {
         codexReasoningSummary = other.codexReasoningSummary;
         openaiApiKey = other.openaiApiKey;
         openaiModel = other.openaiModel;
+        openaiCompatibleBaseUrl = other.openaiCompatibleBaseUrl;
+        openaiCompatibleProtocol = other.openaiCompatibleProtocol;
+        openaiCompatibleApiKey = other.openaiCompatibleApiKey;
+        openaiCompatibleModel = other.openaiCompatibleModel;
         geminiApiKey = other.geminiApiKey;
         geminiModel = other.geminiModel;
         anthropicApiKey = other.anthropicApiKey;
@@ -210,8 +226,12 @@ public class ChatglotConfig {
             provider = DEFAULT_PROVIDER;
         }
         provider = provider.trim().toLowerCase(Locale.ROOT);
+        // Preserve settings written by the initial development build while exposing the clearer custom_llm ID.
+        if ("openai_compatible".equals(provider)) {
+            provider = "custom_llm";
+        }
         switch (provider) {
-            case "default", "deepl", "google", "gas", "codex", "openai", "gemini", "anthropic", "azure", "translategemma_local" -> {
+            case "default", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini", "anthropic", "azure", "translategemma_local" -> {
             }
             default -> provider = DEFAULT_PROVIDER;
         }
@@ -259,6 +279,26 @@ public class ChatglotConfig {
             openaiModel = OPENAI_DEFAULT_MODEL;
         }
         openaiModel = openaiModel.trim();
+
+        if (openaiCompatibleBaseUrl == null || openaiCompatibleBaseUrl.isBlank()) {
+            openaiCompatibleBaseUrl = OPENAI_COMPATIBLE_DEFAULT_BASE_URL;
+        }
+        openaiCompatibleBaseUrl = openaiCompatibleBaseUrl.trim().replaceAll("/+$", "");
+        if (openaiCompatibleProtocol == null) {
+            openaiCompatibleProtocol = OPENAI_COMPATIBLE_PROTOCOL_OPEN_RESPONSES;
+        }
+        openaiCompatibleProtocol = switch (openaiCompatibleProtocol.trim().toLowerCase(Locale.ROOT)) {
+            case OPENAI_COMPATIBLE_PROTOCOL_CHAT_COMPLETIONS -> OPENAI_COMPATIBLE_PROTOCOL_CHAT_COMPLETIONS;
+            default -> OPENAI_COMPATIBLE_PROTOCOL_OPEN_RESPONSES;
+        };
+        if (openaiCompatibleApiKey == null) {
+            openaiCompatibleApiKey = "";
+        }
+        if (openaiCompatibleModel == null) {
+            openaiCompatibleModel = "";
+        }
+        openaiCompatibleApiKey = openaiCompatibleApiKey.trim();
+        openaiCompatibleModel = openaiCompatibleModel.trim();
 
         if (geminiApiKey == null) {
             geminiApiKey = "";

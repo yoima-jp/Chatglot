@@ -2,9 +2,9 @@ package io.github.chatglot.fabric.command;
 
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import io.github.chatglot.ChatglotRuntime;
+import io.github.chatglot.ChatglotConstants;
 import io.github.chatglot.client.ChatOutput;
 import io.github.chatglot.client.ChatTranslationActions;
-import io.github.chatglot.fabric.config.ChatglotConfigScreenFactory;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -59,12 +59,15 @@ public final class ChatglotClientCommands {
         if (client.player == null) {
             return;
         }
+        // LocalPlayer#playSound accepts a SoundEvent directly; avoid the inherited Entity overload
+        // that the compiler cannot resolve due to a missing transitive Fluid API interface.
         client.player.playSound(SoundEvents.EXPERIENCE_ORB_PICKUP, 0.5F, 1.0F);
     }
 
     private static int openConfig(FabricClientCommandSource source) {
         Minecraft client = Minecraft.getInstance();
-        client.execute(() -> client.gui.setScreen(ChatglotConfigScreenFactory.create(client.gui.screen())));
+        client.execute(() -> client.gui.setScreen(
+            com.yoima.moddeck.api.ModDeckApi.createConfigScreen(ChatglotConstants.MOD_ID, client.gui.screen())));
         source.sendFeedback(Component.translatable("chatglot.command.config.opened").withStyle(ChatFormatting.GRAY));
         return 1;
     }

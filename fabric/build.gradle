@@ -1,13 +1,33 @@
 dependencies {
     implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
-    implementation "me.shedaniel.cloth:cloth-config-fabric:${rootProject.cloth_config_version}"
+    // ModDeck provides the declarative config screen. The composite build in
+    // settings.gradle substitutes com.yoima:moddeck:0.1.0 with the sibling :ModDeck project.
+    implementation "com.yoima:moddeck:${rootProject.moddeck_version}"
     implementation(include("com.github.pemistahl:lingua:1.2.2"))
     compileOnly("com.terraformersmc:modmenu:${rootProject.modmenu_version}") {
         exclude group: 'net.fabricmc.fabric-api'
     }
 
     implementation(project(':common')) { transitive = false }
+
+    // The substituted ModDeck project exposes only the main source set through its
+    // apiElements variant; the client-only API (ModDeckApi) lives in the client source set.
+    // Add ModDeck's client classes directly to the fabric compile classpath so client-only
+    // entry points can be referenced. The runtime side is already satisfied by Loom's
+    // mod grouping because the ModDeck jar contains both main and client classes.
+    compileOnly(project(':ModDeck')) {
+        capabilities { requireCapability('com.yoima:moddeck-client-classes') }
+    }
+
+    // Fabric API 0.152.1 resolves fabric-content-registries-v0 11.2.2, which omits the
+    // EntityFluidExtension interface that the merged Minecraft jar expects Entity to
+    // implement. Force the newer 11.3.0+ build that contains this interface so compilation
+    // against remapped Player/Entity types succeeds. This is a compile-only correction;
+    // the runtime constraint remains Fabric API's declared range.
+    compileOnly("net.fabricmc.fabric-api:fabric-content-registries-v0:11.3.0+d0a699d09e") {
+        because 'EntityFluidExtension is missing in 11.2.2 resolved by fabric-api 0.152.1'
+    }
 }
 
 loom {

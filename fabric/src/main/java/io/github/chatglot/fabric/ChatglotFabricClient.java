@@ -4,7 +4,9 @@ import com.mojang.blaze3d.platform.InputConstants;
 import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.fabric.command.ChatglotClientCommands;
-import io.github.chatglot.fabric.config.ChatglotConfigScreenFactory;
+import io.github.chatglot.ChatglotConstants;
+import io.github.chatglot.moddeck.ChatglotModDeckConfig;
+import io.github.chatglot.moddeck.ChatglotModDeckScreenOpener;
 import io.github.chatglot.translation.LanguageUtil;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -12,6 +14,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
@@ -27,6 +30,13 @@ public final class ChatglotFabricClient implements ClientModInitializer {
         ChatglotRuntime.initialize(loader.getConfigDir(), loader.getGameDir());
         applyMinecraftLanguageDefaultIfNeeded();
         applyLocalBackendPolicyOnStartup();
+
+        ChatglotModDeckScreenOpener.setOpener((modId, parent) -> {
+            Minecraft client = Minecraft.getInstance();
+            client.execute(() -> client.setScreenAndShow(
+                com.yoima.moddeck.api.ModDeckApi.createConfigScreen(modId, parent)));
+        });
+        ChatglotModDeckConfig.register();
 
         ChatglotClientCommands.register();
         registerKeyBinding();
@@ -47,7 +57,9 @@ public final class ChatglotFabricClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openConfigKey.consumeClick()) {
-                client.gui.setScreen(ChatglotConfigScreenFactory.create(client.gui.screen()));
+                client.execute(() -> client.setScreenAndShow(
+                    com.yoima.moddeck.api.ModDeckApi.createConfigScreen(
+                        ChatglotConstants.MOD_ID, client.gui.screen())));
             }
         });
     }

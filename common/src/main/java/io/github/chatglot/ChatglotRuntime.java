@@ -14,6 +14,7 @@ import io.github.chatglot.translation.provider.GasTranslationProvider;
 import io.github.chatglot.translation.provider.GeminiTranslationProvider;
 import io.github.chatglot.translation.provider.GoogleTranslationProvider;
 import io.github.chatglot.translation.provider.OpenAiTranslationProvider;
+import io.github.chatglot.translation.provider.OpenAiCompatibleTranslationProvider;
 import io.github.chatglot.translation.provider.TranslateGemmaLocalTranslationProvider;
 import io.github.chatglot.translation.provider.codex.CodexModelCatalogService;
 import io.github.chatglot.translation.provider.model.AnthropicModelCatalogService;
@@ -53,6 +54,7 @@ public final class ChatglotRuntime {
         this.providerRegistry.register(new GasTranslationProvider());
         this.providerRegistry.register(new CodexTranslationProvider());
         this.providerRegistry.register(new OpenAiTranslationProvider());
+        this.providerRegistry.register(new OpenAiCompatibleTranslationProvider());
         this.providerRegistry.register(new GeminiTranslationProvider());
         this.providerRegistry.register(new AnthropicTranslationProvider());
         this.providerRegistry.register(new AzureTranslatorTranslationProvider());

@@ -105,22 +105,19 @@ public final class CodexResponsesService {
         throw new TranslationException("Codex request failed after fallback attempts.\n\n" + detail);
     }
 
-    private static JsonObject createPayload(String model, String prompt, String effort, String summary, boolean includeTruncation) {
+    private static JsonObject createPayload(String model, String prompt, String effort, String summary, boolean includeReasoning) {
         JsonObject payload = new JsonObject();
         payload.addProperty("model", model);
         payload.add("input", createInput(prompt));
         payload.addProperty("instructions", INSTRUCTIONS);
         payload.addProperty("store", false);
         payload.addProperty("stream", true);
-        if (includeTruncation) {
-            payload.addProperty("truncation", "auto");
-        }
 
         JsonObject reasoning = new JsonObject();
-        if (effort != null && !effort.isBlank()) {
+        if (includeReasoning && effort != null && !effort.isBlank()) {
             reasoning.addProperty("effort", effort);
         }
-        if (summary != null && !summary.isBlank()) {
+        if (includeReasoning && summary != null && !summary.isBlank()) {
             reasoning.addProperty("summary", summary);
         }
         if (!reasoning.entrySet().isEmpty()) {
@@ -151,18 +148,18 @@ public final class CodexResponsesService {
             return "";
         }
 
-        JsonElement asJson = tryParse(body.trim());
-        if (asJson != null) {
-            String extracted = extractFromJson(asJson);
-            if (!extracted.isBlank()) {
-                return extracted.trim();
+        boolean sse = isSseResponse(body, contentType);
+        if (!sse) {
+            JsonElement asJson = tryParse(body.trim());
+            if (asJson != null) {
+                String extracted = extractFromJson(asJson);
+                if (!extracted.isBlank()) {
+                    return extracted.trim();
+                }
             }
         }
 
-        List<JsonObject> events = parseSseEvents(body);
-        if (events.isEmpty()) {
-            events = parseNdjsonEvents(body);
-        }
+        List<JsonObject> events = sse ? parseSseEvents(body) : parseNdjsonEvents(body);
         if (!events.isEmpty()) {
             String extracted = extractFromEvents(events);
             if (!extracted.isBlank()) {
@@ -178,7 +175,15 @@ public final class CodexResponsesService {
         );
     }
 
-    private static String extractFromJson(JsonElement root) {
+    private static boolean isSseResponse(String body, String contentType) {
+        if (contentType != null && contentType.toLowerCase(java.util.Locale.ROOT).contains("text/event-stream")) {
+            return true;
+        }
+        String trimmed = body == null ? "" : stripBom(body).stripLeading();
+        return trimmed.startsWith("event:") || trimmed.startsWith("data:");
+    }
+
+    private static String extractFromJson(JsonElement root) throws TranslationException {
         if (root == null || root.isJsonNull()) {
             return "";
         }
@@ -190,6 +195,9 @@ public final class CodexResponsesService {
         }
 
         JsonObject object = root.getAsJsonObject();
+        if (isErrorEvent(object)) {
+            throw new TranslationException(formatCodexError(object));
+        }
         String outputText = readString(object, "output_text");
         if (!outputText.isBlank()) {
             return outputText;
@@ -229,21 +237,35 @@ public final class CodexResponsesService {
 
     private static List<JsonObject> parseSseEvents(String body) {
         List<JsonObject> events = new ArrayList<>();
-        for (String line : body.split("\\R")) {
-            String trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) {
+        StringBuilder data = new StringBuilder();
+        for (String line : body.split("\\R", -1)) {
+            String normalized = stripBom(line);
+            if (normalized.isBlank()) {
+                appendSseEvent(events, data);
+                data.setLength(0);
                 continue;
             }
-            String data = trimmed.substring(5).trim();
-            if (data.isBlank() || "[DONE]".equals(data)) {
-                continue;
-            }
-            JsonElement parsed = tryParse(data);
-            if (parsed != null && parsed.isJsonObject()) {
-                events.add(parsed.getAsJsonObject());
+            String trimmed = normalized.trim();
+            if (trimmed.startsWith("data:")) {
+                if (data.length() > 0) {
+                    data.append('\n');
+                }
+                data.append(trimmed.substring(5).stripLeading());
             }
         }
+        appendSseEvent(events, data);
         return events;
+    }
+
+    private static void appendSseEvent(List<JsonObject> events, StringBuilder data) {
+        String serialized = data.toString().trim();
+        if (serialized.isBlank() || "[DONE]".equals(serialized)) {
+            return;
+        }
+        JsonElement parsed = tryParse(serialized);
+        if (parsed != null && parsed.isJsonObject()) {
+            events.add(parsed.getAsJsonObject());
+        }
     }
 
     private static List<JsonObject> parseNdjsonEvents(String body) {
@@ -261,16 +283,29 @@ public final class CodexResponsesService {
         return events;
     }
 
-    private static String extractFromEvents(List<JsonObject> events) {
+    private static String extractFromEvents(List<JsonObject> events) throws TranslationException {
         StringBuilder builder = new StringBuilder();
         boolean sawDelta = false;
         for (JsonObject event : events) {
             String type = readString(event, "type");
+            if (isErrorEvent(event)) {
+                throw new TranslationException(formatCodexError(event));
+            }
             if ("response.output_text.delta".equals(type)) {
                 String delta = readString(event, "delta");
-                if (!delta.isBlank()) {
+                if (event.has("delta")) {
                     sawDelta = true;
+                }
+                if (!delta.isEmpty()) {
                     builder.append(delta);
+                }
+                continue;
+            }
+
+            if ("response.output_text.done".equals(type) && !sawDelta) {
+                String text = readString(event, "text");
+                if (!text.isEmpty()) {
+                    builder.append(text);
                 }
                 continue;
             }
@@ -278,9 +313,43 @@ public final class CodexResponsesService {
             if ("response.output_item.done".equals(type) && !sawDelta) {
                 JsonObject item = getObject(event, "item");
                 appendContentTexts(builder, getArray(item, "content"));
+                continue;
+            }
+
+            if (("response.completed".equals(type) || "response.done".equals(type)) && !sawDelta) {
+                String completedOutput = extractFromJson(getObject(event, "response"));
+                if (!completedOutput.isEmpty()) {
+                    builder.append(completedOutput);
+                }
             }
         }
         return builder.toString();
+    }
+
+    private static boolean isErrorEvent(JsonObject event) {
+        String type = readString(event, "type");
+        return "error".equals(type)
+            || "response.error".equals(type)
+            || "response.failed".equals(type);
+    }
+
+    private static String formatCodexError(JsonObject event) {
+        JsonObject nestedError = getObject(event, "error");
+        String message = readString(event, "message");
+        if (message.isBlank()) {
+            message = readString(nestedError, "message");
+        }
+        if (message.isBlank()) {
+            message = readString(event, "code");
+        }
+        if (message.isBlank()) {
+            message = event.toString();
+        }
+        return "Codex streaming error: " + message;
+    }
+
+    private static String stripBom(String value) {
+        return value != null && value.startsWith("\uFEFF") ? value.substring(1) : value;
     }
 
     private static void appendContentTexts(StringBuilder builder, JsonArray content) {

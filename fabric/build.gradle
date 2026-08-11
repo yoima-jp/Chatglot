@@ -1,24 +1,23 @@
 dependencies {
     implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
-    // ModDeck provides the declarative config screen. The composite build in
-    // settings.gradle substitutes com.yoima:moddeck:0.1.0 with the sibling :ModDeck project.
-    implementation "com.yoima:moddeck:${rootProject.moddeck_version}"
+    // Use the published Modrinth artifact so clean checkouts do not depend on a sibling project.
+    implementation "maven.modrinth:mod-deck:${rootProject.moddeck_version}"
+    // Lingua is embedded as a nested jar; its Kotlin/Moshi dependencies therefore
+    // must be embedded explicitly as well instead of relying on Gradle's runtime
+    // classpath, which is not present when Fabric loads the released mod jar.
     implementation(include("com.github.pemistahl:lingua:1.2.2"))
+    implementation(include("org.jetbrains.kotlin:kotlin-stdlib:1.6.21"))
+    implementation(include("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.6.0"))
+    implementation(include("org.jetbrains.kotlin:kotlin-reflect:1.6.0"))
+    implementation(include("com.squareup.moshi:moshi:1.13.0"))
+    implementation(include("com.squareup.moshi:moshi-kotlin:1.13.0"))
+    implementation(include("com.squareup.okio:okio:2.10.0"))
     compileOnly("com.terraformersmc:modmenu:${rootProject.modmenu_version}") {
         exclude group: 'net.fabricmc.fabric-api'
     }
 
     implementation(project(':common')) { transitive = false }
-
-    // The substituted ModDeck project exposes only the main source set through its
-    // apiElements variant; the client-only API (ModDeckApi) lives in the client source set.
-    // Add ModDeck's client classes directly to the fabric compile classpath so client-only
-    // entry points can be referenced. The runtime side is already satisfied by Loom's
-    // mod grouping because the ModDeck jar contains both main and client classes.
-    compileOnly(project(':ModDeck')) {
-        capabilities { requireCapability('com.yoima:moddeck-client-classes') }
-    }
 
     // Fabric API 0.152.1 resolves fabric-content-registries-v0 11.2.2, which omits the
     // EntityFluidExtension interface that the merged Minecraft jar expects Entity to

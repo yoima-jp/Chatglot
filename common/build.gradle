@@ -5,7 +5,7 @@ dependencies {
     // classes (ConfigDefinition, ConfigRegistry, options) which live in the shared ModDeck jar.
     // The client-only classes such as screens and widgets are on the fabric module classpath
     // through the :fabric dependency, but they are not referenced here.
-    implementation "com.yoima:moddeck:${rootProject.moddeck_version}"
+    implementation "maven.modrinth:mod-deck:${rootProject.moddeck_version}"
     // Fabric API is not part of the common classpath, so use a compile-only reference to
     // the networking/attachment interfaces implemented by LocalPlayer. At runtime the
     // Fabric loader will provide the actual classes.

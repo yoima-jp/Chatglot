@@ -21,7 +21,7 @@ public final class ChatglotModMenuIntegration implements ModMenuApi {
             FabricLoader loader = FabricLoader.getInstance();
             ChatglotRuntime.initialize(loader.getConfigDir(), loader.getGameDir());
         }
-        ChatglotModDeckConfig.register();
+        ChatglotModDeckConfig.refreshRegistration();
         return com.yoima.moddeck.api.ModDeckApi.createConfigScreen(ChatglotConstants.MOD_ID, parent);
     }
 }

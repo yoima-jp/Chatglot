@@ -12,18 +12,5 @@ pluginManagement {
 
 rootProject.name = "Chatglot"
 
-// Composite build inclusion for the sibling ModDeck project. This makes Chatglot
-// automatically build and resolve ModDeck from ../ModDeck without requiring
-// publishToMavenLocal or a pre-existing jar. Substitutions map the published
-// coordinates com.yoima:moddeck:0.1.0 to the included build.
-def moddeckProjectDir = file("../ModDeck")
-if (moddeckProjectDir.isDirectory() && new File(moddeckProjectDir, "settings.gradle").exists()) {
-    includeBuild(moddeckProjectDir) {
-        dependencySubstitution {
-            substitute module("com.yoima:moddeck") using project(":")
-        }
-    }
-}
-
 include("common")
 include(enabled_platforms.split(','))

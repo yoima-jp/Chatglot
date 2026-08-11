@@ -32,8 +32,8 @@ subprojects {
         mavenCentral()
         maven { url = "https://maven.terraformersmc.com/releases/" }
         maven { url = "https://maven.shedaniel.me/" }
-        // ModDeck is resolved through the composite build declared in settings.gradle,
-        // so no mavenLocal() or flatDir repository is needed here.
+        // ModDeck is published through Modrinth Maven. Keep this repository scoped to
+        // Modrinth coordinates so unrelated modules cannot resolve from it accidentally.
         exclusiveContent {
             forRepository {
                 maven {

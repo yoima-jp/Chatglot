@@ -5,6 +5,7 @@ import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.ChatglotConstants;
 import io.github.chatglot.client.ChatOutput;
 import io.github.chatglot.client.ChatTranslationActions;
+import io.github.chatglot.moddeck.ChatglotModDeckConfig;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
@@ -66,8 +67,11 @@ public final class ChatglotClientCommands {
 
     private static int openConfig(FabricClientCommandSource source) {
         Minecraft client = Minecraft.getInstance();
-        client.execute(() -> client.gui.setScreen(
-            com.yoima.moddeck.api.ModDeckApi.createConfigScreen(ChatglotConstants.MOD_ID, client.gui.screen())));
+        client.execute(() -> {
+            ChatglotModDeckConfig.refreshRegistration();
+            client.gui.setScreen(
+                com.yoima.moddeck.api.ModDeckApi.createConfigScreen(ChatglotConstants.MOD_ID, client.gui.screen()));
+        });
         source.sendFeedback(Component.translatable("chatglot.command.config.opened").withStyle(ChatFormatting.GRAY));
         return 1;
     }

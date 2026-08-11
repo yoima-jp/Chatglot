@@ -33,11 +33,11 @@ public final class ChatglotFabricClient implements ClientModInitializer {
 
         ChatglotModDeckScreenOpener.setOpener((modId, parent) -> {
             Minecraft client = Minecraft.getInstance();
-            client.execute(() -> client.setScreenAndShow(
-                com.yoima.moddeck.api.ModDeckApi.createConfigScreen(modId, parent)));
+            client.execute(() -> {
+                ChatglotModDeckConfig.refreshRegistration();
+                client.setScreenAndShow(com.yoima.moddeck.api.ModDeckApi.createConfigScreen(modId, parent));
+            });
         });
-        ChatglotModDeckConfig.register();
-
         ChatglotClientCommands.register();
         registerKeyBinding();
         registerLifecycleHooks();
@@ -57,9 +57,11 @@ public final class ChatglotFabricClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openConfigKey.consumeClick()) {
-                client.execute(() -> client.setScreenAndShow(
-                    com.yoima.moddeck.api.ModDeckApi.createConfigScreen(
-                        ChatglotConstants.MOD_ID, client.gui.screen())));
+                client.execute(() -> {
+                    ChatglotModDeckConfig.refreshRegistration();
+                    client.setScreenAndShow(com.yoima.moddeck.api.ModDeckApi.createConfigScreen(
+                        ChatglotConstants.MOD_ID, client.gui.screen()));
+                });
             }
         });
     }
@@ -81,6 +83,10 @@ public final class ChatglotFabricClient implements ClientModInitializer {
     }
 
     private static void registerLifecycleHooks() {
+        // Minecraft only exposes its complete language catalog after client resources finish
+        // loading. Registering earlier would leave the target-language selector with en_us only.
+        ClientLifecycleEvents.CLIENT_STARTED.register(client -> ChatglotModDeckConfig.registerIfAbsent());
+
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> {
             if (!ChatglotRuntime.isInitialized()) {
                 return;

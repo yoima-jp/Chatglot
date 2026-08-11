@@ -31,7 +31,7 @@
     "fabricloader": "${fabric_loader_version_range}",
     "minecraft": "${supported_minecraft_version_range}",
     "fabric-api": "${fabric_api_version_range}",
-    "moddeck": "*"
+    "moddeck": ">=${moddeck_version}"
   },
   "suggests": {
     "modmenu": "*"

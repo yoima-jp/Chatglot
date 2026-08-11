@@ -76,7 +76,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 - Minecraft `26.1.2` (`26.1.x` compatible)
 - [Fabric Loader](https://fabricmc.net/)
 - [Fabric API](https://modrinth.com/mod/fabric-api)
-- [ModDeck](https://modrinth.com/mod/moddeck) *(required for in-game settings)*
+- [ModDeck](https://modrinth.com/mod/mod-deck) *(required for in-game settings)*
 - [ModMenu](https://modrinth.com/mod/modmenu) *(optional, recommended)*
 
 ---

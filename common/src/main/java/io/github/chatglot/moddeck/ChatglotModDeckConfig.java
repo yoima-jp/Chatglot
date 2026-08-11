@@ -1,5 +1,6 @@
 package io.github.chatglot.moddeck;
 
+import com.google.gson.stream.JsonReader;
 import com.yoima.moddeck.api.ConfigDefinition;
 import com.yoima.moddeck.api.ConfigRegistry;
 import com.yoima.moddeck.api.ConfigScreenApi;
@@ -21,10 +22,13 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.LanguageInfo;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.Identifier;
+import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -164,11 +168,31 @@ function jsonResponse(obj) {
         ConfigScreenApi.register(definition);
     }
 
+    /**
+     * Registers the definition once the client resources are ready.
+     *
+     * <p>The Minecraft language catalog is incomplete during early client initialization,
+     * so callers that open a screen should use this guard after startup rather than taking
+     * a language snapshot from {@code onInitializeClient()}.</p>
+     */
+    public static void registerIfAbsent() {
+        if (ConfigRegistry.get(ChatglotConstants.MOD_ID).isEmpty()) {
+            register();
+        }
+    }
+
+    /** Rebuilds runtime-dependent choices immediately before opening the screen. */
+    public static void refreshRegistration() {
+        ChatglotRuntime runtime = ChatglotRuntime.get();
+        ConfigScreenApi.registerOrReplace(buildMainDefinition(runtime, runtime.configManager().get()));
+    }
+
     private static ConfigDefinition buildMainDefinition(ChatglotRuntime runtime, ChatglotConfig config) {
         // Collect Minecraft language choices once at build time. Choices are a
         // snapshot; if the player changes language while the screen is open,
         // closing and reopening the screen refreshes them.
         List<MinecraftLanguageOption> languageOptions = collectLanguageOptions(Minecraft.getInstance());
+        LOGGER.info("Building ModDeck config with {} Minecraft language choices.", languageOptions.size());
         MinecraftLanguageOption defaultLanguageOption = createDefaultLanguageOption(
             resolveCurrentLanguageOption(Minecraft.getInstance(), languageOptions));
         List<MinecraftLanguageOption> selectableLanguageOptions = prependDefaultOption(defaultLanguageOption, languageOptions);
@@ -901,11 +925,62 @@ function jsonResponse(obj) {
             String label = entry.getValue().toComponent().getString();
             result.add(new MinecraftLanguageOption(code, ConfigText.literal(label)));
         }
+        // Minecraft 26.2 can expose only en_us through LanguageManager even though the
+        // downloaded asset pack contains every language. Read the same native name/region
+        // fields from those language resources instead of shipping a stale hard-coded list.
+        if (result.size() <= 1) {
+            collectLanguageResourceOptions(client).forEach(option -> {
+                if (findOptionByCode(result, option.code()).isEmpty()) {
+                    result.add(option);
+                }
+            });
+        }
         result.sort((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.label().value(), right.label().value()));
         if (result.isEmpty()) {
             result.add(new MinecraftLanguageOption("en_us", ConfigText.literal("English (US)")));
         }
         return result;
+    }
+
+    private static List<MinecraftLanguageOption> collectLanguageResourceOptions(Minecraft client) {
+        List<MinecraftLanguageOption> result = new ArrayList<>();
+        Map<Identifier, Resource> resources = client.getResourceManager().listResources(
+            "lang",
+            id -> id.getNamespace().equals("minecraft") && id.getPath().endsWith(".json")
+        );
+        for (Map.Entry<Identifier, Resource> entry : resources.entrySet()) {
+            String path = entry.getKey().getPath();
+            String code = path.substring("lang/".length(), path.length() - ".json".length());
+            readLanguageLabel(entry.getValue()).ifPresent(label ->
+                result.add(new MinecraftLanguageOption(code, ConfigText.literal(label))));
+        }
+        LOGGER.info("Discovered {} Minecraft language resources as a fallback.", result.size());
+        return result;
+    }
+
+    private static Optional<String> readLanguageLabel(Resource resource) {
+        String name = null;
+        String region = null;
+        try (JsonReader reader = new JsonReader(resource.openAsReader())) {
+            reader.beginObject();
+            while (reader.hasNext() && (name == null || region == null)) {
+                String key = reader.nextName();
+                if ("language.name".equals(key)) {
+                    name = reader.nextString();
+                } else if ("language.region".equals(key)) {
+                    region = reader.nextString();
+                } else {
+                    reader.skipValue();
+                }
+            }
+        } catch (IOException | IllegalStateException exception) {
+            LOGGER.warn("Could not read Minecraft language metadata from {}.", resource.sourcePackId(), exception);
+            return Optional.empty();
+        }
+        if (name == null || name.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.of(region == null || region.isBlank() ? name : name + " (" + region + ")");
     }
 
     private static MinecraftLanguageOption resolveCurrentLanguageOption(Minecraft client, List<MinecraftLanguageOption> options) {
@@ -948,9 +1023,10 @@ function jsonResponse(obj) {
     }
 
     private static MinecraftLanguageOption createDefaultLanguageOption(MinecraftLanguageOption currentLanguageOption) {
-        String currentLabel = currentLanguageOption.label().value();
-        String label = Component.translatable("chatglot.config.target_language.default", currentLabel).getString();
-        return new MinecraftLanguageOption(LanguageUtil.MINECRAFT_DEFAULT_TARGET, ConfigText.literal(label));
+        return new MinecraftLanguageOption(
+            LanguageUtil.MINECRAFT_DEFAULT_TARGET,
+            ConfigText.translatable("chatglot.config.target_language.default", currentLanguageOption.label().component())
+        );
     }
 
     private static List<MinecraftLanguageOption> prependDefaultOption(

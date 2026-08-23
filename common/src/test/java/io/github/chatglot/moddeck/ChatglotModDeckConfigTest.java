@@ -10,6 +10,7 @@ import com.yoima.moddeck.api.ConfigRegistry;
 import com.yoima.moddeck.api.option.BooleanOption;
 import com.yoima.moddeck.api.option.IntegerOption;
 import com.yoima.moddeck.api.option.StringOption;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import io.github.chatglot.ChatglotConstants;
 import io.github.chatglot.ChatglotRuntime;
@@ -92,6 +93,32 @@ class ChatglotModDeckConfigTest {
         assertTrue(definition.option("general", "auto_translate").isPresent());
         assertTrue(definition.option("general", "request_timeout").isPresent());
         assertTrue(definition.option("general", "max_concurrent_translations").isPresent());
+    }
+
+    @Test
+    void gasScriptDecodesMarkerContentsOnlyAtFinalBoundary() throws Exception {
+        String script = gasScriptTemplate();
+
+        // Marker contents remain HTML-encoded until the final full-result decode. This keeps
+        // literal entity-looking chat text from being decoded twice during marker restoration.
+        assertFalse(script.contains("decodeHtml(content)"));
+        assertEquals(2, script.lines().filter(line -> line.contains("decodeHtml(translatedHtml)")).count());
+    }
+
+    @Test
+    void gasScriptPreservesWhitespaceBetweenTranslatedMarkers() throws Exception {
+        String script = gasScriptTemplate();
+
+        // A translator may add a real word separator between adjacent styled spans when the
+        // target language requires one; the script must not collapse those boundaries.
+        assertFalse(script.contains("\"$1$2\""));
+        assertTrue(script.contains("return decodeHtml(translatedHtml);"));
+    }
+
+    private static String gasScriptTemplate() throws Exception {
+        Field field = ChatglotModDeckConfig.class.getDeclaredField("GAS_SCRIPT_TEMPLATE");
+        field.setAccessible(true);
+        return (String) field.get(null);
     }
 
 

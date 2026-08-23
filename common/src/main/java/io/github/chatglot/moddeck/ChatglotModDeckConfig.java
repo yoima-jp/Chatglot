@@ -70,19 +70,11 @@ function doPost(e) {
 
 function handleRequest(e, method) {
   try {
-    var params = {};
+    var params = getRequestParams(e, method);
 
-    if (method === "GET") {
-      params = (e && e.parameter) ? e.parameter : {};
-    } else if (method === "POST") {
-      if (e && e.postData && e.postData.contents) {
-        params = JSON.parse(e.postData.contents);
-      }
-    }
-
-    var text = (params.text || "").toString().trim();
-    var target = (params.target || "").toString().trim();
-    var source = (params.source || "").toString().trim();
+    var text = String(params.text || "").trim();
+    var target = String(params.target || "").trim();
+    var source = String(params.source || "").trim();
 
     if (!text) {
       return jsonResponse({
@@ -100,7 +92,11 @@ function handleRequest(e, method) {
       });
     }
 
-    var translatedText = LanguageApp.translate(text, source, target);
+    var translatedText = translateText(
+      text,
+      source,
+      target
+    );
 
     return jsonResponse({
       ok: true,
@@ -121,9 +117,153 @@ function handleRequest(e, method) {
   }
 }
 
-function jsonResponse(obj) {
+
+function getRequestParams(e, method) {
+  if (method === "GET") {
+    return e && e.parameter
+      ? e.parameter
+      : {};
+  }
+
+  if (method === "POST") {
+    if (e && e.postData && e.postData.contents) {
+      return JSON.parse(e.postData.contents);
+    }
+
+    return {};
+  }
+
+  return {};
+}
+
+
+function translateText(text, source, target) {
+  var protectedTextPattern =
+    /\\[\\[CGT_(\\d+)\\]\\]([\\s\\S]*?)\\[\\[\\/CGT_\\1\\]\\]/g;
+
+  var html = "";
+  var lastIndex = 0;
+  var expectedIds = {};
+  var match;
+
+  while ((match = protectedTextPattern.exec(text)) !== null) {
+    html += escapeHtml(
+      text.substring(lastIndex, match.index)
+    );
+
+    var id = match[1];
+    var protectedText = match[2];
+
+    expectedIds[id] = true;
+
+    html +=
+      '<span data-cgt-id="' + id + '">' +
+      escapeHtml(protectedText) +
+      '</span>';
+
+    lastIndex = protectedTextPattern.lastIndex;
+  }
+
+  html += escapeHtml(text.substring(lastIndex));
+
+  var translatedHtml = LanguageApp.translate(
+    html,
+    source,
+    target,
+    {
+      contentType: "html"
+    }
+  );
+
+  // Without Chatglot markers, return before scanning translated HTML for marker
+  // spans so literal HTML-looking chat text cannot be mistaken for metadata.
+  if (Object.keys(expectedIds).length === 0) {
+    return decodeHtml(translatedHtml);
+  }
+
+  var foundIds = {};
+
+  translatedHtml = translatedHtml.replace(
+    /<span\\b[^>]*data-cgt-id\\s*=\\s*["'](\\d+)["'][^>]*>([\\s\\S]*?)<\\/span>/gi,
+    function(_, id, content) {
+      foundIds[id] = true;
+
+      // Keep the span content encoded until every marker has been restored.
+      // Decoding here and again after replacement would turn literal chat text
+      // such as "&amp;" or "&#65;" into different characters.
+      return (
+        "[[CGT_" + id + "]]" +
+        content +
+        "[[/CGT_" + id + "]]"
+      );
+    }
+  );
+
+  var expectedIdList = Object.keys(expectedIds);
+
+  for (var i = 0; i < expectedIdList.length; i++) {
+    var expectedId = expectedIdList[i];
+
+    if (!foundIds[expectedId]) {
+      throw new Error(
+        "CGT_" + expectedId + " was lost during translation."
+      );
+    }
+  }
+
+  // Whitespace inserted between translated spans may be required by the target
+  // language, so preserve it and decode the complete result exactly once.
+  return decodeHtml(translatedHtml);
+}
+
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+
+function decodeHtml(text) {
+  return String(text)
+    .replace(/&#x([0-9a-fA-F]+);/g, function(_, hex) {
+      var codePoint = parseInt(hex, 16);
+
+      return validCodePoint(codePoint)
+        ? String.fromCodePoint(codePoint)
+        : _;
+    })
+    .replace(/&#([0-9]+);/g, function(_, decimal) {
+      var codePoint = parseInt(decimal, 10);
+
+      return validCodePoint(codePoint)
+        ? String.fromCodePoint(codePoint)
+        : _;
+    })
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+
+function validCodePoint(codePoint) {
+  return (
+    codePoint >= 0 &&
+    codePoint <= 0x10ffff &&
+    !(codePoint >= 0xd800 && codePoint <= 0xdfff)
+  );
+}
+
+
+function jsonResponse(data) {
   return ContentService
-    .createTextOutput(JSON.stringify(obj))
+    .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
 }
     """;

@@ -175,6 +175,8 @@ function translateText(text, source, target) {
     }
   );
 
+  // Without Chatglot markers, return before scanning translated HTML for marker
+  // spans so literal HTML-looking chat text cannot be mistaken for metadata.
   if (Object.keys(expectedIds).length === 0) {
     return decodeHtml(translatedHtml);
   }
@@ -186,9 +188,12 @@ function translateText(text, source, target) {
     function(_, id, content) {
       foundIds[id] = true;
 
+      // Keep the span content encoded until every marker has been restored.
+      // Decoding here and again after replacement would turn literal chat text
+      // such as "&amp;" or "&#65;" into different characters.
       return (
         "[[CGT_" + id + "]]" +
-        decodeHtml(content) +
+        content +
         "[[/CGT_" + id + "]]"
       );
     }
@@ -206,10 +211,9 @@ function translateText(text, source, target) {
     }
   }
 
-  return decodeHtml(translatedHtml).replace(
-    /(\\[\\[\\/CGT_\\d+\\]\\])\\s+(\\[\\[CGT_\\d+\\]\\])/g,
-    "$1$2"
-  );
+  // Whitespace inserted between translated spans may be required by the target
+  // language, so preserve it and decode the complete result exactly once.
+  return decodeHtml(translatedHtml);
 }
 
 

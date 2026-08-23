@@ -10,13 +10,20 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 final class StyledTranslationTemplate {
+    private static final Logger LOGGER = LoggerFactory.getLogger("Chatglot/StyledTranslation");
     private static final String TOKEN_PREFIX = "[[CGT_";
     private static final String TOKEN_SUFFIX = "]]";
     private static final String TOKEN_CLOSE_PREFIX = "[[/CGT_";
     private static final Style DEFAULT_TEXT_STYLE = Style.EMPTY.withColor(ChatFormatting.WHITE);
     private static final Pattern LEADING_SPEAKER_PATTERN = Pattern.compile("^(<[^<>\\r\\n]+>\\s*)");
+    private static final Pattern RELAXED_TOKEN_PATTERN = Pattern.compile(
+        "\\[\\[\\s*(/?)\\s*C\\s*G\\s*T\\s*_\\s*(\\d+)\\s*\\]\\]",
+        Pattern.CASE_INSENSITIVE
+    );
 
     private final String markedText;
     private final List<Segment> segments;
@@ -64,7 +71,8 @@ final class StyledTranslationTemplate {
             Segment segment = new Segment(
                 TOKEN_PREFIX + index + TOKEN_SUFFIX,
                 TOKEN_CLOSE_PREFIX + index + TOKEN_SUFFIX,
-                mergeWithDefaultStyle(style)
+                mergeWithDefaultStyle(style),
+                remainder
             );
             segments.add(segment);
             marked.append(segment.openToken()).append(remainder).append(segment.closeToken());
@@ -84,7 +92,7 @@ final class StyledTranslationTemplate {
     }
 
     public Component apply(String translatedText) {
-        String value = translatedText == null ? "" : translatedText;
+        String value = normalizeMarkerTokens(translatedText == null ? "" : translatedText);
         if (segments.isEmpty()) {
             return Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
         }
@@ -93,26 +101,46 @@ final class StyledTranslationTemplate {
         appendLiteral(rebuilt, preservedPrefix, fallbackStyle);
         int cursor = 0;
         boolean appliedMarker = false;
+        Segment previousSegment = null;
         while (cursor < value.length()) {
             SegmentMatch nextSegment = findNextSegment(value, cursor);
             if (nextSegment == null) {
                 appendLiteral(rebuilt, value.substring(cursor), fallbackStyle);
+                if (!appliedMarker) {
+                    LOGGER.warn(
+                        "Could not restore translation markers: segments={}, firstMarkerIndex={}, translatedPrefixCodePoints={}",
+                        segments.size(),
+                        value.indexOf(segments.getFirst().openToken()),
+                        describeCodePoints(value, 20)
+                    );
+                }
                 return appliedMarker ? rebuilt : Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
             }
 
             if (nextSegment.startIndex() > cursor) {
-                appendLiteral(rebuilt, value.substring(cursor, nextSegment.startIndex()), fallbackStyle);
+                String gap = value.substring(cursor, nextSegment.startIndex());
+                if (!isInsertedWhitespaceBetweenSymbols(gap, previousSegment, nextSegment.segment())) {
+                    appendLiteral(rebuilt, gap, fallbackStyle);
+                }
             }
 
             int contentStart = nextSegment.startIndex() + nextSegment.segment().openToken().length();
             int contentEnd = value.indexOf(nextSegment.segment().closeToken(), contentStart);
             if (contentEnd < 0) {
+                LOGGER.warn(
+                    "Could not restore closing translation marker: marker={}, translatedPrefixCodePoints={}",
+                    nextSegment.segment().closeToken(),
+                    describeCodePoints(value, 20)
+                );
                 return Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
             }
 
-            appendLiteral(rebuilt, value.substring(contentStart, contentEnd), nextSegment.segment().style());
+            String translatedSegment = value.substring(contentStart, contentEnd);
+            translatedSegment = removeInsertedBoundaryWhitespace(translatedSegment, nextSegment.segment());
+            appendLiteral(rebuilt, translatedSegment, nextSegment.segment().style());
             cursor = contentEnd + nextSegment.segment().closeToken().length();
             appliedMarker = true;
+            previousSegment = nextSegment.segment();
         }
 
         return appliedMarker ? rebuilt : Component.literal(preservedPrefix + value).setStyle(fallbackStyle);
@@ -153,6 +181,58 @@ final class StyledTranslationTemplate {
         target.append(Component.literal(text).setStyle(mergeWithDefaultStyle(style)));
     }
 
+    private static String normalizeMarkerTokens(String value) {
+        // Some translation backends insert whitespace inside marker names (for example,
+        // "[[/CG T_22]]"). Canonicalize only complete Chatglot-shaped tokens so ordinary
+        // translated whitespace and message text remain untouched.
+        return RELAXED_TOKEN_PATTERN.matcher(value).replaceAll(result ->
+            "[[" + (result.group(1).isEmpty() ? "" : "/") + "CGT_" + result.group(2) + "]]"
+        );
+    }
+
+    private static boolean isInsertedWhitespaceBetweenSymbols(String gap, Segment previous, Segment next) {
+        if (previous == null || next == null || gap == null || !gap.isBlank()) {
+            return false;
+        }
+        // Translators sometimes add HTML element separators around decorative runs. Remove
+        // those only when both source segments are entirely non-linguistic; spaces inserted
+        // between translated words must remain available to the target language.
+        return isNonLinguistic(previous.originalText()) && isNonLinguistic(next.originalText());
+    }
+
+    private static String removeInsertedBoundaryWhitespace(String translatedText, Segment segment) {
+        String originalText = segment.originalText();
+        if (!isNonLinguistic(originalText) || translatedText == null || translatedText.isEmpty()) {
+            return translatedText;
+        }
+
+        // GAS may add spaces inside protected spans while translating decorative symbols.
+        // Remove only boundary whitespace that did not exist in the source segment, so
+        // meaningful whitespace in ordinary text and deliberately spaced symbols survives.
+        String normalized = translatedText;
+        if (!Character.isWhitespace(originalText.codePointAt(0))) {
+            normalized = normalized.stripLeading();
+        }
+        if (!Character.isWhitespace(originalText.codePointBefore(originalText.length()))) {
+            normalized = normalized.stripTrailing();
+        }
+        return normalized;
+    }
+
+    private static boolean isNonLinguistic(String value) {
+        return value != null && !value.isEmpty() && value.codePoints().noneMatch(Character::isLetterOrDigit);
+    }
+
+    private static String describeCodePoints(String value, int limit) {
+        if (value == null || value.isEmpty()) {
+            return "<empty>";
+        }
+        return value.codePoints()
+            .limit(limit)
+            .mapToObj(codePoint -> String.format("U+%04X", codePoint))
+            .collect(java.util.stream.Collectors.joining(" "));
+    }
+
     private static Style mergeWithDefaultStyle(Style style) {
         if (style == null) {
             return DEFAULT_TEXT_STYLE;
@@ -160,10 +240,11 @@ final class StyledTranslationTemplate {
         return style.applyTo(DEFAULT_TEXT_STYLE);
     }
 
-    private record Segment(String openToken, String closeToken, Style style) {
+    private record Segment(String openToken, String closeToken, Style style, String originalText) {
         private Segment {
             Objects.requireNonNull(openToken, "openToken");
             Objects.requireNonNull(closeToken, "closeToken");
+            Objects.requireNonNull(originalText, "originalText");
             style = mergeWithDefaultStyle(style);
         }
     }

@@ -18,9 +18,8 @@ Chatglot's main goal is to keep practical Minecraft chat translation available f
 
 ## Future Translation Targets
 
-Chatglot currently focuses on chat messages. Future versions may expand translation support to other player-facing text surfaces, including:
+Chatglot supports chat messages and manual translation of signs and hanging signs (default key: G). Future versions may expand translation support to other player-facing text surfaces, including:
 
-- Signs and hanging signs
 - Written books and book pages
 - Other in-game text surfaces where translation can be added without server-side installation
 

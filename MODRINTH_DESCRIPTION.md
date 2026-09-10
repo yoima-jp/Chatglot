@@ -14,6 +14,8 @@ Client-side only. No server installation is required.
 - Result shown as a new line **or** replaces the original chat message
 - Open the settings screen with `F8` or `/chatglot config`
 - Translate a specific message with `/chatglot translate <id>`
+- Aim at a sign or hanging sign and press `G` (rebindable) to translate its visible face in a lower-screen panel. Looking away dismisses it after 0.8 seconds; the sign itself is unchanged.
+- Sign translation is manual and uses the selected provider. External providers receive the visible face's text; repeated translations reuse a cache for the current world session.
 
 ---
 

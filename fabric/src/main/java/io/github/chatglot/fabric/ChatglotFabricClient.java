@@ -40,6 +40,7 @@ public final class ChatglotFabricClient implements ClientModInitializer {
         });
         ChatglotClientCommands.register();
         registerKeyBinding();
+        SignTranslationController.register(CHATGLOT_CATEGORY);
         registerLifecycleHooks();
 
         ChatglotFabric.LOGGER.info("Chatglot initialized.");

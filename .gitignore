@@ -13,4 +13,6 @@ fabric/build/
 .tmp/
 .vscode/
 /config/
+/dist/
+**/logs/
 AGENTS.md

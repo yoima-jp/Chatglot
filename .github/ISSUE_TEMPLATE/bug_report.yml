@@ -47,14 +47,14 @@ body:
     id: minecraft_version
     attributes:
       label: Minecraft version
-      placeholder: "26.1"
+      placeholder: "26.3"
     validations:
       required: true
   - type: input
     id: chatglot_version
     attributes:
       label: Chatglot version
-      placeholder: "26.03.29-mc26.1"
+      placeholder: "YY.MM.DD-mc26.3"
     validations:
       required: true
   - type: dropdown

@@ -22,4 +22,21 @@ class ChatglotConfigTest {
 
         assertEquals("gpt-5.6-luna", config.codexModel);
     }
+
+    @Test
+    void usesGpt56LunaAsTheOpenAiDefaultModel() {
+        ChatglotConfig config = new ChatglotConfig();
+
+        assertEquals("gpt-5.6-luna", config.openaiModel);
+    }
+
+    @Test
+    void migratesThePreviousOpenAiDefaultModel() {
+        ChatglotConfig config = new ChatglotConfig();
+        config.openaiModel = "gpt-5-nano";
+
+        config.sanitize();
+
+        assertEquals("gpt-5.6-luna", config.openaiModel);
+    }
 }

@@ -1,6 +1,6 @@
 # Chatglot `/tellraw` tests
 
-Use these commands in a Minecraft 26.2 world with commands enabled. After each
+Use these commands in a Minecraft 26.3 world with commands enabled. After each
 message appears, click Chatglot's translate button and compare the result with
 the expected behavior.
 

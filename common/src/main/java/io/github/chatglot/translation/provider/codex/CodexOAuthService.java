@@ -4,7 +4,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.chatglot.translation.TranslationException;
-import java.awt.Desktop;
+import io.github.chatglot.util.ExternalLinkOpener;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -31,7 +31,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -350,23 +349,9 @@ public final class CodexOAuthService {
     }
 
     private static void openBrowser(String url) throws TranslationException {
-        Exception desktopFailure = null;
         try {
-            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
-                Desktop.getDesktop().browse(URI.create(url));
-                return;
-            }
+            ExternalLinkOpener.openUrl(url);
         } catch (Exception e) {
-            desktopFailure = e;
-        }
-
-        try {
-            Util.getPlatform().openUri(url);
-            return;
-        } catch (Exception e) {
-            if (desktopFailure != null) {
-                e.addSuppressed(desktopFailure);
-            }
             throw new TranslationException("Failed to open browser for OAuth. URL: " + url, e);
         }
     }

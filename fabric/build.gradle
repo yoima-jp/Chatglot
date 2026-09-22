@@ -1,8 +1,9 @@
 dependencies {
     implementation "net.fabricmc:fabric-loader:${rootProject.fabric_loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${rootProject.fabric_api_version}"
-    // Use the published Modrinth artifact so clean checkouts do not depend on a sibling project.
-    implementation "maven.modrinth:mod-deck:${rootProject.moddeck_version}"
+    // ModDeck reuses version 0.1.0 for Minecraft 26.2 and 26.3. Use the
+    // checksum-pinned 26.3 artifact selected by the root download task.
+    implementation files(rootProject.moddeck_jar)
     // Lingua is embedded as a nested jar; its Kotlin/Moshi dependencies therefore
     // must be embedded explicitly as well instead of relying on Gradle's runtime
     // classpath, which is not present when Fabric loads the released mod jar.

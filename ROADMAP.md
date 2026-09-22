@@ -5,7 +5,7 @@ Chatglot's main goal is to keep practical Minecraft chat translation available f
 ## Current Priority
 
 - Publish Fabric builds for the latest stable Minecraft Java version as quickly as possible after the Fabric toolchain and required dependencies are ready.
-- Keep the current Minecraft 26.1.x support line working while tracking new stable Minecraft releases.
+- Keep the current Minecraft 26.3.x support line working while tracking new stable Minecraft releases.
 - Maintain clear Modrinth releases so users can find the correct build for their Minecraft version.
 - Improve provider reliability, error messages, and diagnostics for translation failures.
 

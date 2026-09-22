@@ -9,7 +9,8 @@ public class ChatglotConfig {
     public static final String GAS_DEFAULT_WEB_APP_URL =
         "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
     public static final String CODEX_DEFAULT_MODEL = "gpt-5.6-luna";
-    public static final String OPENAI_DEFAULT_MODEL = "gpt-5-nano";
+    public static final String OPENAI_DEFAULT_MODEL = "gpt-5.6-luna";
+    private static final String LEGACY_OPENAI_DEFAULT_MODEL = "gpt-5-nano";
     public static final String OPENAI_COMPATIBLE_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1";
     public static final String OPENAI_COMPATIBLE_PROTOCOL_OPEN_RESPONSES = "openresponses";
     public static final String OPENAI_COMPATIBLE_PROTOCOL_CHAT_COMPLETIONS = "chat_completions";
@@ -275,7 +276,11 @@ public class ChatglotConfig {
         if (openaiApiKey == null) {
             openaiApiKey = "";
         }
-        if (openaiModel == null || openaiModel.isBlank()) {
+        if (
+            openaiModel == null
+                || openaiModel.isBlank()
+                || LEGACY_OPENAI_DEFAULT_MODEL.equalsIgnoreCase(openaiModel.trim())
+        ) {
             openaiModel = OPENAI_DEFAULT_MODEL;
         }
         openaiModel = openaiModel.trim();

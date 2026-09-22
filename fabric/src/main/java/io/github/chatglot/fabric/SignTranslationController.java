@@ -7,7 +7,6 @@ import io.github.chatglot.client.SignTranslationState.Key;
 import io.github.chatglot.client.SignTranslationState.Target;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -24,9 +23,9 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.level.block.entity.SignBlockEntity;
+import net.minecraft.world.level.block.entity.SignTextSlot;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
-import org.lwjgl.glfw.GLFW;
 
 final class SignTranslationController {
     private final KeyMapping translateKey;
@@ -38,7 +37,7 @@ final class SignTranslationController {
 
     private SignTranslationController(KeyMapping.Category category) {
         translateKey = KeyMappingHelper.registerKeyMapping(new KeyMapping(
-            "key.chatglot.translate_sign", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, category
+            "key.chatglot.translate_sign", InputConstants.Type.KEYBOARD, InputConstants.KEY_G, category
         ));
     }
 
@@ -111,9 +110,10 @@ final class SignTranslationController {
             || !(client.level.getBlockEntity(hit.getBlockPos()) instanceof SignBlockEntity sign)) {
             return null;
         }
-        boolean front = sign.isFacingFrontText(client.player);
+        SignTextSlot slot = sign.getSlotPlayerIsFacing(client.player);
+        boolean front = slot == SignTextSlot.FRONT;
         // Use the same filtered face as vanilla, without forwarding click/hover events.
-        String text = Arrays.stream(sign.getText(front).getMessages(client.isTextFilteringEnabled()))
+        String text = sign.getText(slot).getMessages(client.isTextFilteringEnabled()).stream()
             .map(Component::getString).collect(Collectors.joining("\n")).strip();
         if (text.isBlank() || text.length() > 4096) {
             return null;

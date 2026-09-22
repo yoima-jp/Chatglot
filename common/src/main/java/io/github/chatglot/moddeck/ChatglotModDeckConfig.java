@@ -16,6 +16,7 @@ import io.github.chatglot.localbackend.LocalBackendStatus;
 import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.provider.codex.CodexOAuthService;
 import io.github.chatglot.translation.provider.codex.CodexTokenStore;
+import io.github.chatglot.util.ExternalLinkOpener;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -24,7 +25,6 @@ import net.minecraft.client.resources.language.LanguageInfo;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.util.Util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -568,7 +568,7 @@ function jsonResponse(data) {
                 () -> copyGasScriptTemplate(Minecraft.getInstance()))
             .buttonOption("gas_open_apps_script", ConfigText.translatable("chatglot.config.gas_open_apps_script"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.gas_open_apps_script"),
-                () -> Util.getPlatform().openUri(GAS_APPS_SCRIPT_HOME_URL))
+                () -> openExternalUrl(GAS_APPS_SCRIPT_HOME_URL))
             .descriptionEntry("gas_step1", ConfigText.translatable("chatglot.config.guide.gas.step1"))
             .descriptionEntry("gas_step2", ConfigText.translatable("chatglot.config.guide.gas.step2"))
             .descriptionEntry("gas_step3", ConfigText.translatable("chatglot.config.guide.gas.step3"))
@@ -580,13 +580,13 @@ function jsonResponse(data) {
             .addOption(deeplKey)
             .buttonOption("deepl_get_api_key", ConfigText.translatable("chatglot.config.deepl_get_api_key"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.deepl_get_api_key"),
-                () -> Util.getPlatform().openUri(DEEPL_API_KEYS_URL))
+                () -> openExternalUrl(DEEPL_API_KEYS_URL))
             .addOption(deeplFree)
             .categoryKey(CAT_GOOGLE, "chatglot.config.category.provider.google")
             .addOption(googleKey)
             .buttonOption("google_get_api_key", ConfigText.translatable("chatglot.config.google_get_api_key"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.google_get_api_key"),
-                () -> Util.getPlatform().openUri(GOOGLE_TRANSLATE_API_KEYS_URL))
+                () -> openExternalUrl(GOOGLE_TRANSLATE_API_KEYS_URL))
             .categoryKey(CAT_CODEX, "chatglot.config.category.provider.codex")
             .addOption(codexTokenFile)
             .addOption(codexModel)
@@ -602,7 +602,7 @@ function jsonResponse(data) {
             .addOption(openaiKey)
             .buttonOption("openai_get_api_key", ConfigText.translatable("chatglot.config.openai_get_api_key"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.openai_get_api_key"),
-                () -> Util.getPlatform().openUri(OPENAI_API_KEYS_URL))
+                () -> openExternalUrl(OPENAI_API_KEYS_URL))
             .addOption(openaiModel)
             .buttonOption("openai_model_refresh", ConfigText.translatable("chatglot.config.openai_model_refresh"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.openai_model_refresh"),
@@ -616,7 +616,7 @@ function jsonResponse(data) {
             .addOption(geminiKey)
             .buttonOption("gemini_get_api_key", ConfigText.translatable("chatglot.config.gemini_get_api_key"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.gemini_get_api_key"),
-                () -> Util.getPlatform().openUri(GEMINI_API_KEYS_URL))
+                () -> openExternalUrl(GEMINI_API_KEYS_URL))
             .addOption(geminiModel)
             .buttonOption("gemini_model_refresh", ConfigText.translatable("chatglot.config.gemini_model_refresh"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.gemini_model_refresh"),
@@ -625,7 +625,7 @@ function jsonResponse(data) {
             .addOption(anthropicKey)
             .buttonOption("anthropic_get_api_key", ConfigText.translatable("chatglot.config.anthropic_get_api_key"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.anthropic_get_api_key"),
-                () -> Util.getPlatform().openUri(ANTHROPIC_API_KEYS_URL))
+                () -> openExternalUrl(ANTHROPIC_API_KEYS_URL))
             .addOption(anthropicModel)
             .buttonOption("anthropic_model_refresh", ConfigText.translatable("chatglot.config.anthropic_model_refresh"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.anthropic_model_refresh"),
@@ -654,14 +654,14 @@ function jsonResponse(data) {
             .addOption(azureKey)
             .buttonOption("azure_get_api_key", ConfigText.translatable("chatglot.config.azure_get_api_key"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.azure_get_api_key"),
-                () -> Util.getPlatform().openUri(AZURE_TRANSLATOR_API_KEYS_URL))
+                () -> openExternalUrl(AZURE_TRANSLATOR_API_KEYS_URL))
             .addOption(azureRegion)
             .addOption(azureEndpoint)
             .categoryKey(CAT_SUPPORT, "chatglot.config.category.support")
             .descriptionEntry("support_issue_notice", ConfigText.translatable("chatglot.config.support.issue_notice"))
             .buttonOption("support_report_issue", ConfigText.translatable("chatglot.config.support.report_issue"),
                 ConfigText.empty(), ConfigText.translatable("chatglot.config.support.report_issue"),
-                () -> Util.getPlatform().openUri(GITHUB_ISSUES_URL))
+                () -> openExternalUrl(GITHUB_ISSUES_URL))
             .build();
     }
 
@@ -895,12 +895,20 @@ function jsonResponse(data) {
         try {
             Path logFile = LocalBackendPaths.logFile(LocalBackendPaths.resolveSharedRoot(config, ChatglotRuntime.get().configDir()));
             java.nio.file.Files.createDirectories(logFile.getParent());
-            Util.getPlatform().openUri(logFile.toUri());
+            ExternalLinkOpener.openFile(logFile);
         } catch (Exception e) {
             LOGGER.warn("Failed to open local backend log: {}", e.getMessage());
             ChatOutput.post(
                 Component.translatable("chatglot.config.local_backend_status_message",
                     Component.literal("Failed to open log: " + e.getMessage())));
+        }
+    }
+
+    private static void openExternalUrl(String url) {
+        try {
+            ExternalLinkOpener.openUrl(url);
+        } catch (IOException error) {
+            LOGGER.warn("Failed to open external URL: {}", url, error);
         }
     }
 
@@ -1065,7 +1073,7 @@ function jsonResponse(data) {
             String label = entry.getValue().toComponent().getString();
             result.add(new MinecraftLanguageOption(code, ConfigText.literal(label)));
         }
-        // Minecraft 26.2 can expose only en_us through LanguageManager even though the
+        // Minecraft 26.3 client can expose only en_us through LanguageManager even though the
         // downloaded asset pack contains every language. Read the same native name/region
         // fields from those language resources instead of shipping a stale hard-coded list.
         if (result.size() <= 1) {
@@ -1263,6 +1271,26 @@ function jsonResponse(data) {
     private record MinecraftLanguageOption(String code, ConfigText label) {
         ConfigText labelText() {
             return label;
+        }
+
+        // ModDeck decodes persisted selector values before it can reuse the options built for
+        // the current resource catalog. The decoder therefore creates a fresh option object;
+        // selector membership must be based on the stable language code rather than the label
+        // object, which may differ between the saved value and the current resource pack.
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof MinecraftLanguageOption that)) {
+                return false;
+            }
+            return normalizeLanguageCode(code).equals(normalizeLanguageCode(that.code));
+        }
+
+        @Override
+        public int hashCode() {
+            return normalizeLanguageCode(code).hashCode();
         }
     }
 

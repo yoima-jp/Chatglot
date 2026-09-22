@@ -9,7 +9,6 @@ import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -36,19 +35,21 @@ public final class DeepLTranslationProvider implements TranslationProvider {
             throw new TranslationException("DeepL API key is empty. Set it in Chatglot config.");
         }
 
-        StringBuilder body = new StringBuilder();
-        appendForm(body, "text", request.text());
-        appendForm(body, "target_lang", request.targetLanguage());
+        JsonObject payload = new JsonObject();
+        JsonArray text = new JsonArray();
+        text.add(request.text());
+        payload.add("text", text);
+        payload.addProperty("target_lang", request.targetLanguage());
         if (request.sourceLanguageHint() != null && !request.sourceLanguageHint().isBlank()) {
-            appendForm(body, "source_lang", request.sourceLanguageHint());
+            payload.addProperty("source_lang", request.sourceLanguageHint());
         }
         String endpoint = config.deeplUseFreeApi ? DEEPL_FREE_ENDPOINT : DEEPL_PRO_ENDPOINT;
 
         HttpRequest httpRequest = HttpRequest.newBuilder(URI.create(endpoint))
             .timeout(Duration.ofSeconds(config.requestTimeoutSeconds))
             .header("Authorization", AUTH_HEADER_PREFIX + config.deeplApiKey.trim())
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .POST(HttpRequest.BodyPublishers.ofString(body.toString(), StandardCharsets.UTF_8))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(payload.toString(), StandardCharsets.UTF_8))
             .build();
 
         try {
@@ -82,12 +83,4 @@ public final class DeepLTranslationProvider implements TranslationProvider {
         }
     }
 
-    private static void appendForm(StringBuilder builder, String key, String value) {
-        if (!builder.isEmpty()) {
-            builder.append('&');
-        }
-        builder.append(URLEncoder.encode(key, StandardCharsets.UTF_8));
-        builder.append('=');
-        builder.append(URLEncoder.encode(value, StandardCharsets.UTF_8));
-    }
 }

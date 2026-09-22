@@ -3,7 +3,7 @@
 [![Modrinth Downloads](https://img.shields.io/modrinth/dt/chatglot?logo=modrinth&label=Modrinth%20downloads)](https://modrinth.com/mod/chatglot)
 [![Modrinth Version](https://img.shields.io/modrinth/v/chatglot?logo=modrinth&label=Latest%20Modrinth%20release)](https://modrinth.com/mod/chatglot/versions)
 [![License: MIT](https://img.shields.io/github/license/yoima-jp/Chatglot)](LICENSE)
-[![Minecraft](https://img.shields.io/badge/Minecraft-26.1.x%20%7C%201.21.x-2ea043)](https://modrinth.com/mod/chatglot/versions)
+[![Minecraft](https://img.shields.io/badge/Minecraft-26.3.x-2ea043)](https://modrinth.com/mod/chatglot/versions)
 
 ![Chat translation examples](https://cdn.modrinth.com/data/cached_images/7225369d145f4b9bd970aa38485f37cbfe4782c3.png)
 **Chatglot** is a Fabric client-side mod that translates Minecraft chat messages on the fly.  
@@ -76,7 +76,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 
 ## Requirements
 
-- Minecraft `26.1.2` (`26.1.x` compatible)
+- Minecraft `26.3` (`26.3.x` compatible)
 - [Fabric Loader](https://fabricmc.net/)
 - [Fabric API](https://modrinth.com/mod/fabric-api)
 - [ModDeck](https://modrinth.com/mod/mod-deck) *(required for in-game settings)*

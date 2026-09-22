@@ -16,7 +16,6 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 
 public final class ChatglotFabricClient implements ClientModInitializer {
     private static KeyMapping openConfigKey;
@@ -50,8 +49,8 @@ public final class ChatglotFabricClient implements ClientModInitializer {
         openConfigKey = KeyMappingHelper.registerKeyMapping(
             new KeyMapping(
                 "key.chatglot.open_config",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_F8,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_F8,
                 CHATGLOT_CATEGORY
             )
         );

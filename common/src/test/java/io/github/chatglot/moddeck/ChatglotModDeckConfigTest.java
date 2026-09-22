@@ -1,6 +1,7 @@
 package io.github.chatglot.moddeck;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -93,6 +94,16 @@ class ChatglotModDeckConfigTest {
         assertTrue(definition.option("general", "auto_translate").isPresent());
         assertTrue(definition.option("general", "request_timeout").isPresent());
         assertTrue(definition.option("general", "max_concurrent_translations").isPresent());
+    }
+
+    @Test
+    void targetLanguageSelectorAcceptsPersistedMinecraftDefaultValue() {
+        ChatglotModDeckConfig.register();
+
+        ConfigDefinition definition = ConfigRegistry.get(ChatglotConstants.MOD_ID).orElseThrow();
+        var targetLanguage = definition.option("general", "target_language").orElseThrow();
+
+        assertDoesNotThrow(() -> targetLanguage.decode("MINECRAFT_DEFAULT"));
     }
 
     @Test

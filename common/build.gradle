@@ -5,7 +5,9 @@ dependencies {
     // classes (ConfigDefinition, ConfigRegistry, options) which live in the shared ModDeck jar.
     // The client-only classes such as screens and widgets are on the fabric module classpath
     // through the :fabric dependency, but they are not referenced here.
-    implementation "maven.modrinth:mod-deck:${rootProject.moddeck_version}"
+    // ModDeck reuses version 0.1.0 for Minecraft 26.2 and 26.3. Use the
+    // checksum-pinned 26.3 artifact selected by the root download task.
+    implementation files(rootProject.moddeck_jar)
     // Fabric API is not part of the common classpath, so use a compile-only reference to
     // the networking/attachment interfaces implemented by LocalPlayer. At runtime the
     // Fabric loader will provide the actual classes.

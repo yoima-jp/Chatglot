@@ -3,6 +3,7 @@ package io.github.chatglot.translation;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public final class TranslationException extends Exception {
     public enum Kind {
@@ -26,6 +27,9 @@ public final class TranslationException extends Exception {
     private final String detail;
     private final boolean connectionTimeout;
     private final boolean suppressedByBreaker;
+    private final boolean breakerTriggered;
+    // One in-flight exception can reach several callers; only the first chat callback announces its transition.
+    private final AtomicBoolean breakerNoticeClaimed = new AtomicBoolean();
 
     // Legacy call sites keep UNKNOWN so classification is only claimed where the failure source is known.
     public TranslationException(String message) {
@@ -33,7 +37,7 @@ public final class TranslationException extends Exception {
     }
 
     public TranslationException(String message, Throwable cause) {
-        this(message, cause, Kind.UNKNOWN, null, null, null, false, false);
+        this(message, cause, Kind.UNKNOWN, null, null, null, false, false, false);
     }
 
     private TranslationException(
@@ -44,9 +48,11 @@ public final class TranslationException extends Exception {
         Integer httpStatus,
         Duration retryAfter,
         boolean connectionTimeout,
-        boolean suppressedByBreaker
+        boolean suppressedByBreaker,
+        boolean breakerTriggered
     ) {
-        this(message, cause, kind, providerId, httpStatus, retryAfter, null, connectionTimeout, suppressedByBreaker);
+        this(message, cause, kind, providerId, httpStatus, retryAfter, null,
+            connectionTimeout, suppressedByBreaker, breakerTriggered);
     }
 
     private TranslationException(
@@ -58,7 +64,8 @@ public final class TranslationException extends Exception {
         Duration retryAfter,
         String detail,
         boolean connectionTimeout,
-        boolean suppressedByBreaker
+        boolean suppressedByBreaker,
+        boolean breakerTriggered
     ) {
         super(message, cause);
         this.kind = kind == null ? Kind.UNKNOWN : kind;
@@ -68,6 +75,7 @@ public final class TranslationException extends Exception {
         this.detail = detail;
         this.connectionTimeout = connectionTimeout;
         this.suppressedByBreaker = suppressedByBreaker;
+        this.breakerTriggered = breakerTriggered;
     }
 
     public static TranslationException classified(
@@ -79,7 +87,9 @@ public final class TranslationException extends Exception {
         String detail,
         Throwable cause
     ) {
-        return new TranslationException(message, cause, kind, providerId, httpStatus, retryAfter, detail, false, false);
+        return new TranslationException(
+            message, cause, kind, providerId, httpStatus, retryAfter, detail, false, false, false
+        );
     }
 
     public static TranslationException classified(Kind kind, String message, String providerId) {
@@ -118,21 +128,39 @@ public final class TranslationException extends Exception {
         return suppressedByBreaker;
     }
 
+    public boolean breakerTriggered() {
+        return breakerTriggered;
+    }
+
+    public boolean claimBreakerNotice() {
+        return breakerTriggered && breakerNoticeClaimed.compareAndSet(false, true);
+    }
+
     public TranslationException asConnectionTimeout() {
         return new TranslationException(
-            getMessage(), getCause(), kind, providerId, httpStatus, retryAfter, detail, true, suppressedByBreaker
+            getMessage(), getCause(), kind, providerId, httpStatus, retryAfter, detail,
+            true, suppressedByBreaker, breakerTriggered
         );
     }
 
     public TranslationException asSuppressedByBreaker() {
         return new TranslationException(
-            getMessage(), getCause(), kind, providerId, httpStatus, retryAfter, detail, connectionTimeout, true
+            getMessage(), getCause(), kind, providerId, httpStatus, retryAfter, detail,
+            connectionTimeout, true, false
         );
     }
 
     public TranslationException withProviderId(String value) {
         return new TranslationException(
-            getMessage(), getCause(), kind, value, httpStatus, retryAfter, detail, connectionTimeout, suppressedByBreaker
+            getMessage(), getCause(), kind, value, httpStatus, retryAfter, detail,
+            connectionTimeout, suppressedByBreaker, breakerTriggered
+        );
+    }
+
+    public TranslationException asBreakerTriggered() {
+        return new TranslationException(
+            getMessage(), getCause(), kind, providerId, httpStatus, retryAfter, detail,
+            connectionTimeout, suppressedByBreaker, true
         );
     }
 }

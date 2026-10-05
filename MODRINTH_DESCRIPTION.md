@@ -14,6 +14,8 @@ Client-side only. No server installation is required.
 - Result shown as a new line **or** replaces the original chat message
 - Open the settings screen with `F8` or `/chatglot config`
 - Translate a specific message with `/chatglot translate <id>`
+- Run `/chatglot diagnose` to send `Hello` to the selected provider and show the translation time and result. TranslateGemma's backend status is shown before the test.
+- Translation errors show a short reason. Hover for provider and diagnostic details, open settings from supported errors, and see when repeated failures temporarily pause automatic translation.
 - Aim at a sign or hanging sign and press `G` (rebindable) to translate its visible face in a lower-screen panel. Looking away dismisses it after 0.8 seconds; the sign itself is unchanged.
 - Sign translation is manual and uses the selected provider. External providers receive the visible face's text; repeated translations reuse a cache for the current world session.
 - In a written book or lectern, press `G` or the small `Translate` button to translate the current page only. Press again to switch between translation and original; changing pages never sends a request automatically.
@@ -77,6 +79,8 @@ Key settings:
 ## Privacy Notice — External Data Transmission
 
 **This mod sends chat text to external translation services.** The destination depends on the provider you select.
+
+Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected provider.
 
 Manually translating a sign sends its visible text to the selected provider. Manually translating a book page sends only that page's text to the selected provider. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
 

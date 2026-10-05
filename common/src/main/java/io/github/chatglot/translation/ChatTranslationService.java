@@ -147,8 +147,7 @@ public final class ChatTranslationService {
                     : exception;
                 long elapsedNanos = System.nanoTime() - startedAtNanos;
                 if (!TranslationRetryPolicy.shouldRetry(failure, retriesUsed)) {
-                    circuitBreaker.recordFailure(providerId, config, failure);
-                    completeFailure(key, shared, failure);
+                    completeFailure(key, shared, recordFailure(providerId, config, failure));
                     return;
                 }
 
@@ -162,8 +161,7 @@ public final class ChatTranslationService {
                 );
                 // Codex keeps a five-second floor for each fallback request, so shorter remaining budgets cannot be honored.
                 if (remainingSeconds < ("codex".equals(providerId) ? 5 : 1)) {
-                    circuitBreaker.recordFailure(providerId, config, failure);
-                    completeFailure(key, shared, failure);
+                    completeFailure(key, shared, recordFailure(providerId, config, failure));
                     return;
                 }
 
@@ -186,8 +184,7 @@ public final class ChatTranslationService {
                     System.nanoTime() - startedAtNanos, budgetNanos, 0
                 );
                 if (remainingSeconds < ("codex".equals(providerId) ? 5 : 1)) {
-                    circuitBreaker.recordFailure(providerId, config, failure);
-                    completeFailure(key, shared, failure);
+                    completeFailure(key, shared, recordFailure(providerId, config, failure));
                     return;
                 }
 
@@ -210,6 +207,16 @@ public final class ChatTranslationService {
     ) {
         inFlight.remove(key, shared);
         shared.completeExceptionally(failure);
+    }
+
+    private TranslationException recordFailure(
+        String providerId,
+        ChatglotConfig config,
+        TranslationException failure
+    ) {
+        return circuitBreaker.recordFailureAndReportTransition(providerId, config, failure)
+            ? failure.asBreakerTriggered()
+            : failure;
     }
 
     private static CompletableFuture<TranslationResult> failed(TranslationException exception) {

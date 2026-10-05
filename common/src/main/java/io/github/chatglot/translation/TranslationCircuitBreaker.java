@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.LongSupplier;
 
 public final class TranslationCircuitBreaker {
@@ -45,8 +46,16 @@ public final class TranslationCircuitBreaker {
     }
 
     public void recordFailure(String providerId, ChatglotConfig config, TranslationException failure) {
+        recordFailureAndReportTransition(providerId, config, failure);
+    }
+
+    public boolean recordFailureAndReportTransition(
+        String providerId,
+        ChatglotConfig config,
+        TranslationException failure
+    ) {
         if (providerId == null || failure == null) {
-            return;
+            return false;
         }
         Kind kind = failure.kind();
         long now = clockMillis.getAsLong();
@@ -62,9 +71,16 @@ public final class TranslationCircuitBreaker {
             case AUTH, CONFIG_MISSING -> Block.configBound(failure, config);
             default -> null;
         };
-        if (block != null) {
-            blocks.put(providerId, block);
+        if (block == null) {
+            return false;
         }
+
+        AtomicBoolean triggered = new AtomicBoolean();
+        blocks.compute(providerId, (ignored, previous) -> {
+            triggered.set(!isActive(previous, config, now));
+            return block;
+        });
+        return triggered.get();
     }
 
     public void recordSuccess(String providerId) {
@@ -75,6 +91,12 @@ public final class TranslationCircuitBreaker {
 
     public boolean isBlocked(String providerId, ChatglotConfig config) {
         return failureIfBlocked(providerId, config).isPresent();
+    }
+
+    private static boolean isActive(Block block, ChatglotConfig config, long now) {
+        return block != null && (block.configBound
+            ? block.config == config
+            : now < block.expiresAtMillis);
     }
 
     private static long durationMillis(Duration duration) {

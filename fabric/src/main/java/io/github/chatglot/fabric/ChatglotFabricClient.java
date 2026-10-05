@@ -39,7 +39,8 @@ public final class ChatglotFabricClient implements ClientModInitializer {
         });
         ChatglotClientCommands.register();
         registerKeyBinding();
-        SignTranslationController.register(CHATGLOT_CATEGORY);
+        KeyMapping translateSurfaceKey = SignTranslationController.register(CHATGLOT_CATEGORY);
+        BookTranslationController.register(translateSurfaceKey);
         registerLifecycleHooks();
 
         ChatglotFabric.LOGGER.info("Chatglot initialized.");

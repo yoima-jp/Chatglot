@@ -16,14 +16,17 @@ Chatglot's main goal is to keep practical Minecraft chat translation available f
 - Continue improving the local TranslateGemma backend setup, health checks, logs, and failure messages.
 - Keep privacy and data-transmission notes accurate for every provider that can receive chat text.
 
+## Current Translation Targets
+
+Chatglot supports chat messages, signs and hanging signs, and written books. In a book or lectern, press `G` or the small `Translate` button to translate only the current page; page changes do not send requests automatically. The page text is sent to the selected provider when translation is requested. The local TranslateGemma option keeps it on the device.
+
 ## Future Translation Targets
 
-Chatglot supports chat messages and manual translation of signs and hanging signs (default key: G). Future versions may expand translation support to other player-facing text surfaces, including:
+Future versions may expand translation support to other player-facing text surfaces, including:
 
-- Written books and book pages
 - Other in-game text surfaces where translation can be added without server-side installation
 
-These features need careful UX design because they may involve longer text, formatting, interaction timing, and different Minecraft UI screens than chat messages.
+Other targets may need careful UX design because they can involve longer text, formatting, interaction timing, and different Minecraft UI screens than chat messages.
 
 ## Longer Term
 

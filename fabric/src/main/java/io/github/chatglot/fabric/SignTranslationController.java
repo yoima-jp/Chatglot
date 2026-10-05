@@ -41,7 +41,7 @@ final class SignTranslationController {
         ));
     }
 
-    static void register(KeyMapping.Category category) {
+    static KeyMapping register(KeyMapping.Category category) {
         SignTranslationController controller = new SignTranslationController(category);
         ClientTickEvents.END_CLIENT_TICK.register(controller::tick);
         // Chat messages occupy the same lower-screen area. Render after the vanilla chat
@@ -50,6 +50,7 @@ final class SignTranslationController {
             VanillaHudElements.CHAT, Identifier.fromNamespaceAndPath("chatglot", "sign_translation"),
             (graphics, deltaTracker) -> controller.render(graphics)
         );
+        return controller.translateKey;
     }
 
     private void tick(Minecraft client) {

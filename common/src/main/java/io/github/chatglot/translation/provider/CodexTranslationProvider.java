@@ -34,7 +34,7 @@ public final class CodexTranslationProvider implements TranslationProvider {
             config.requestTimeoutSeconds
         );
         if (translated == null || translated.isBlank()) {
-            throw new TranslationException("Codex returned empty output.");
+            throw ProviderHttp.emptyOutput(id(), "Codex returned empty output.");
         }
         return new TranslationResult(translated, request.sourceLanguageHint(), id());
     }

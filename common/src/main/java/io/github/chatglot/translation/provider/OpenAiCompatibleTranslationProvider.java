@@ -3,14 +3,12 @@ package io.github.chatglot.translation.provider;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.TranslationException;
 import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +19,6 @@ import java.util.Locale;
 public final class OpenAiCompatibleTranslationProvider implements TranslationProvider {
     private static final String SYSTEM_PROMPT =
         "You are a translation engine for Minecraft chat messages. Return only translated text without explanations.";
-
-    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Override
     public String id() {
@@ -53,26 +49,19 @@ public final class OpenAiCompatibleTranslationProvider implements TranslationPro
         }
 
         try {
-            HttpResponse<String> response = httpClient.send(
-                requestBuilder.build(),
-                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
-            );
-            if (response.statusCode() >= 400) {
-                throw createHttpException(response.statusCode(), response.body());
-            }
+            HttpResponse<String> response = ProviderHttp.send(requestBuilder.build(), id(), "Compatible API");
+            ProviderHttp.requireSuccess(response, id(), "Compatible API");
 
-            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject root = ProviderHttp.parseJson(response.body(), id(), "Compatible API").getAsJsonObject();
             String translated = chatCompletions ? extractChatCompletionText(root) : extractOpenResponsesText(root);
             if (translated.isBlank()) {
-                throw new TranslationException("The compatible API returned empty output.");
+                throw ProviderHttp.emptyOutput(id(), "The compatible API returned empty output.");
             }
             return new TranslationResult(translated, request.sourceLanguageHint(), id());
         } catch (TranslationException e) {
             throw e;
-        } catch (IllegalArgumentException e) {
-            throw new TranslationException("The compatible API returned an unsupported response format.", e);
-        } catch (Exception e) {
-            throw new TranslationException("The compatible API request failed.", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "The compatible API returned an invalid response.", e.getMessage());
         }
     }
 
@@ -103,54 +92,43 @@ public final class OpenAiCompatibleTranslationProvider implements TranslationPro
 
     private static URI resolveEndpoint(String configuredBaseUrl, String endpointPath) throws TranslationException {
         if (configuredBaseUrl == null || configuredBaseUrl.isBlank()) {
-            throw new TranslationException("Compatible API Base URL is empty.");
+            throw ProviderHttp.configMissing("custom_llm", "Compatible API Base URL is empty.");
         }
         try {
             URI baseUri = URI.create(configuredBaseUrl.trim());
             String scheme = baseUri.getScheme() == null ? "" : baseUri.getScheme().toLowerCase(Locale.ROOT);
             if (!("http".equals(scheme) || "https".equals(scheme)) || baseUri.getHost() == null) {
-                throw new TranslationException("Compatible API Base URL must be an HTTP or HTTPS URL.");
+                throw ProviderHttp.configMissing("custom_llm", "Compatible API Base URL must be an HTTP or HTTPS URL.");
             }
             if (baseUri.getUserInfo() != null || baseUri.getQuery() != null || baseUri.getFragment() != null) {
-                throw new TranslationException("Compatible API Base URL must not contain credentials, a query, or a fragment.");
+                throw ProviderHttp.configMissing("custom_llm", "Compatible API Base URL must not contain credentials, a query, or a fragment.");
             }
             String normalizedBase = configuredBaseUrl.trim().replaceAll("/+$", "");
             return URI.create(normalizedBase + "/" + endpointPath);
         } catch (TranslationException e) {
             throw e;
         } catch (IllegalArgumentException e) {
-            throw new TranslationException("Compatible API Base URL is invalid.", e);
+            throw TranslationException.caused(
+                TranslationException.Kind.CONFIG_MISSING, "Compatible API Base URL is invalid.", "custom_llm", e
+            );
         }
     }
 
     private static String requireModel(String configuredModel) throws TranslationException {
         if (configuredModel == null || configuredModel.isBlank()) {
-            throw new TranslationException("Compatible API model is empty.");
+            throw ProviderHttp.configMissing("custom_llm", "Compatible API model is empty.");
         }
         return configuredModel.trim();
-    }
-
-    private static TranslationException createHttpException(int statusCode, String body) {
-        String guidance = switch (statusCode) {
-            case 401, 403 -> " Check the API key.";
-            case 404 -> " Check the Base URL and selected API format.";
-            case 429 -> " The server rate limit was reached.";
-            default -> "";
-        };
-        return new TranslationException(
-            "Compatible API request failed (" + statusCode + ")." + guidance + " "
-                + TranslationPromptBuilder.abbreviate(body, 500)
-        );
     }
 
     private static String extractChatCompletionText(JsonObject root) throws TranslationException {
         JsonArray choices = root.getAsJsonArray("choices");
         if (choices == null || choices.isEmpty() || !choices.get(0).isJsonObject()) {
-            throw new TranslationException("The compatible API returned no choices.");
+            throw ProviderHttp.badResponse("custom_llm", "The compatible API returned no choices.", root.toString());
         }
         JsonObject message = choices.get(0).getAsJsonObject().getAsJsonObject("message");
         if (message == null) {
-            throw new TranslationException("The compatible API returned no message.");
+            throw ProviderHttp.badResponse("custom_llm", "The compatible API returned no message.", root.toString());
         }
         return extractContentText(message.get("content"));
     }
@@ -161,7 +139,7 @@ public final class OpenAiCompatibleTranslationProvider implements TranslationPro
         }
         JsonArray output = root.getAsJsonArray("output");
         if (output == null) {
-            throw new TranslationException("The compatible API returned no output.");
+            throw ProviderHttp.badResponse("custom_llm", "The compatible API returned no output.", root.toString());
         }
         StringBuilder result = new StringBuilder();
         for (JsonElement itemElement : output) {

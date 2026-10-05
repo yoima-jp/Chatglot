@@ -5,8 +5,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.chatglot.translation.TranslationException;
+import io.github.chatglot.translation.TranslationException.Kind;
+import io.github.chatglot.translation.provider.ProviderHttp;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -19,8 +20,6 @@ public final class CodexResponsesService {
     private static final String ENDPOINT = "https://chatgpt.com/backend-api/codex/responses";
     private static final String INSTRUCTIONS = "You are OpenCode, a coding assistant.";
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-
     public String translate(
         CodexAuthTokens tokens,
         String model,
@@ -30,7 +29,7 @@ public final class CodexResponsesService {
         int timeoutSeconds
     ) throws TranslationException {
         if (tokens == null || tokens.accessToken() == null || tokens.accessToken().isBlank()) {
-            throw new TranslationException("Codex access token is empty.");
+            throw ProviderHttp.configMissing("codex", "Codex access token is empty.");
         }
 
         List<PayloadCandidate> payloads = List.of(
@@ -41,6 +40,7 @@ public final class CodexResponsesService {
             ? List.of(false)
             : List.of(true, false);
         List<String> errors = new ArrayList<>();
+        TranslationException lastFailure = null;
 
         for (boolean withAccountHeader : accountHeaderModes) {
             for (PayloadCandidate payload : payloads) {
@@ -57,21 +57,37 @@ public final class CodexResponsesService {
                     builder.header("ChatGPT-Account-Id", tokens.accountId());
                 }
 
+                HttpResponse<String> response;
                 try {
-                    HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                    if (response.statusCode() >= 400) {
-                        errors.add(
-                            "status=" + response.statusCode()
-                                + " header.account_id=" + withAccountHeader
-                                + " payload=" + payload.label()
-                                + " body=" + abbreviate(response.body(), 800)
-                        );
-                        if (!isPayloadRetryableStatus(response.statusCode())) {
-                            break;
-                        }
-                        continue;
+                    response = ProviderHttp.send(builder.build(), "codex", "Codex");
+                } catch (TranslationException e) {
+                    lastFailure = e;
+                    errors.add(
+                        "network_error header.account_id=" + withAccountHeader
+                            + " payload=" + payload.label()
+                            + " reason=" + e.getMessage()
+                    );
+                    if (Thread.currentThread().isInterrupted()) {
+                        throw e;
                     }
+                    break;
+                }
 
+                if (response.statusCode() >= 400) {
+                    lastFailure = ProviderHttp.httpFailure(response, "codex", "Codex");
+                    errors.add(
+                        "status=" + response.statusCode()
+                            + " header.account_id=" + withAccountHeader
+                            + " payload=" + payload.label()
+                            + " body=" + lastFailure.detail()
+                    );
+                    if (!isPayloadRetryableStatus(response.statusCode())) {
+                        break;
+                    }
+                    continue;
+                }
+
+                try {
                     String parsed = parseResponse(
                         response.body(),
                         response.headers().firstValue("Content-Type").orElse("")
@@ -79,30 +95,41 @@ public final class CodexResponsesService {
                     if (!parsed.isBlank()) {
                         return parsed;
                     }
+                    lastFailure = ProviderHttp.emptyOutput("codex", "Codex returned empty output.");
                     errors.add(
                         "empty_output status=" + response.statusCode()
                             + " header.account_id=" + withAccountHeader
                             + " payload=" + payload.label()
                     );
                 } catch (TranslationException e) {
+                    lastFailure = e;
                     errors.add(
                         "parse_error header.account_id=" + withAccountHeader
                             + " payload=" + payload.label()
                             + " reason=" + e.getMessage()
                     );
-                } catch (Exception e) {
-                    errors.add(
-                        "network_error header.account_id=" + withAccountHeader
-                            + " payload=" + payload.label()
-                            + " reason=" + e.getMessage()
-                    );
-                    break;
                 }
             }
         }
 
         String detail = errors.isEmpty() ? "no details" : String.join("\n\n", errors);
-        throw new TranslationException("Codex request failed after fallback attempts.\n\n" + detail);
+        Kind kind = lastFailure == null ? Kind.BAD_RESPONSE : lastFailure.kind();
+        Integer status = lastFailure == null || lastFailure.httpStatus().isEmpty()
+            ? null
+            : lastFailure.httpStatus().getAsInt();
+        TranslationException failure = TranslationException.classified(
+            kind,
+            "Codex request failed after fallback attempts.",
+            "codex",
+            status,
+            lastFailure == null ? null : lastFailure.retryAfter().orElse(null),
+            ProviderHttp.maskAndLimit(detail),
+            lastFailure
+        );
+        if (lastFailure != null && lastFailure.connectionTimeout()) {
+            failure = failure.asConnectionTimeout();
+        }
+        throw failure;
     }
 
     private static JsonObject createPayload(String model, String prompt, String effort, String summary, boolean includeReasoning) {
@@ -147,6 +174,9 @@ public final class CodexResponsesService {
         if (body == null) {
             return "";
         }
+        if (body.isBlank()) {
+            throw ProviderHttp.emptyOutput("codex", "Codex returned empty output.");
+        }
 
         boolean sse = isSseResponse(body, contentType);
         if (!sse) {
@@ -167,11 +197,10 @@ public final class CodexResponsesService {
             }
         }
 
-        throw new TranslationException(
-            "Unexpected response format from Codex endpoint. content_type="
-                + contentType
-                + " body_preview="
-                + abbreviate(body, 500)
+        throw ProviderHttp.badResponse(
+            "codex",
+            "Codex returned an invalid response.",
+            "content_type=" + contentType + " body_preview=" + abbreviate(body, 500)
         );
     }
 
@@ -196,7 +225,11 @@ public final class CodexResponsesService {
 
         JsonObject object = root.getAsJsonObject();
         if (isErrorEvent(object)) {
-            throw new TranslationException(formatCodexError(object));
+            throw TranslationException.classified(
+                Kind.BAD_RESPONSE,
+                "Codex returned an error response.",
+                "codex", null, null, ProviderHttp.maskAndLimit(formatCodexError(object)), null
+            );
         }
         String outputText = readString(object, "output_text");
         if (!outputText.isBlank()) {
@@ -289,7 +322,11 @@ public final class CodexResponsesService {
         for (JsonObject event : events) {
             String type = readString(event, "type");
             if (isErrorEvent(event)) {
-                throw new TranslationException(formatCodexError(event));
+                throw TranslationException.classified(
+                    Kind.BAD_RESPONSE,
+                    "Codex returned an error response.",
+                    "codex", null, null, ProviderHttp.maskAndLimit(formatCodexError(event)), null
+                );
             }
             if ("response.output_text.delta".equals(type)) {
                 String delta = readString(event, "delta");

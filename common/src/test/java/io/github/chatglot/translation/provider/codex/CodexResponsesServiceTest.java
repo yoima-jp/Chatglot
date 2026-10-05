@@ -267,8 +267,8 @@ class CodexResponsesServiceTest {
 
         // The message is the structured Codex error form so callers can surface upstream
         // failures verbatim.
-        assertTrue(ex.getMessage().contains("Codex streaming error"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("rate limited"), ex.getMessage());
+        assertEquals("Codex returned an error response.", ex.getMessage());
+        assertTrue(ex.detail().contains("rate limited"), ex.detail());
     }
 
     @Test
@@ -280,8 +280,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse(sse, "text/event-stream"));
 
-        assertTrue(ex.getMessage().contains("Codex streaming error"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("bad token"), ex.getMessage());
+        assertTrue(ex.detail().contains("bad token"), ex.detail());
     }
 
     @Test
@@ -294,8 +293,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse(sse, "text/event-stream"));
 
-        assertTrue(ex.getMessage().contains("Codex streaming error"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("response.failed"), ex.getMessage());
+        assertTrue(ex.detail().contains("response.failed"), ex.detail());
     }
 
     @Test
@@ -315,7 +313,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse(sse, "text/event-stream"));
 
-        assertTrue(ex.getMessage().contains("too many requests"), ex.getMessage());
+        assertTrue(ex.detail().contains("too many requests"), ex.detail());
     }
 
     @Test
@@ -368,7 +366,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse(ndjson, "application/x-ndjson"));
 
-        assertTrue(ex.getMessage().contains("ndjson failure"), ex.getMessage());
+        assertTrue(ex.detail().contains("ndjson failure"), ex.detail());
     }
 
     @Test
@@ -379,8 +377,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse("{\"type\":\"error\",\"message\":\"json error\"}", "application/json"));
 
-        assertTrue(ex.getMessage().contains("Codex streaming error"), ex.getMessage());
-        assertTrue(ex.getMessage().contains("json error"), ex.getMessage());
+        assertTrue(ex.detail().contains("json error"), ex.detail());
     }
 
     @Test
@@ -388,12 +385,11 @@ class CodexResponsesServiceTest {
         // An empty body yields no JSON and no events. This must raise rather than silently
         // return an empty string, because an empty translation is indistinguishable from a
         // parsing bug. An empty body is not classified as SSE (no leading event:/data:), so
-        // it goes through the JSON then NDJSON paths, both empty, and raises the generic
-        // unexpected-format exception.
+        // it is classified as an empty provider response.
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse("", "text/event-stream"));
 
-        assertTrue(ex.getMessage().contains("Unexpected response format"), ex.getMessage());
+        assertEquals("Codex returned empty output.", ex.getMessage());
     }
 
     @Test
@@ -417,8 +413,8 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse("not json and not sse", ""));
 
-        assertTrue(ex.getMessage().contains("content_type="), ex.getMessage());
-        assertTrue(ex.getMessage().contains("body_preview="), ex.getMessage());
+        assertTrue(ex.detail().contains("content_type="), ex.detail());
+        assertTrue(ex.detail().contains("body_preview="), ex.detail());
     }
 
     @Test
@@ -429,7 +425,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse("data: [DONE]\n\n", "text/event-stream"));
 
-        assertTrue(ex.getMessage().contains("Unexpected response format"), ex.getMessage());
+        assertTrue(ex.detail().contains("body_preview="), ex.detail());
     }
 
     @Test
@@ -447,7 +443,7 @@ class CodexResponsesServiceTest {
         TranslationException ex = assertThrows(TranslationException.class,
             () -> parseResponse(sse, "text/event-stream"));
 
-        assertTrue(ex.getMessage().contains("Unexpected response format"), ex.getMessage());
+        assertTrue(ex.detail().contains("body_preview="), ex.detail());
     }
 
     @Test

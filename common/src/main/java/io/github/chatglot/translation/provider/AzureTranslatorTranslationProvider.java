@@ -2,14 +2,12 @@ package io.github.chatglot.translation.provider;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.TranslationException;
 import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -20,8 +18,6 @@ import java.util.Locale;
 public final class AzureTranslatorTranslationProvider implements TranslationProvider {
     private static final String AZURE_TRANSLATE_PATH = "/translate?api-version=3.0";
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-
     @Override
     public String id() {
         return "azure";
@@ -31,7 +27,7 @@ public final class AzureTranslatorTranslationProvider implements TranslationProv
     public TranslationResult translate(TranslationRequest request, ChatglotConfig config, Path configDir, Path gameDir)
         throws TranslationException {
         if (config.azureTranslatorApiKey == null || config.azureTranslatorApiKey.isBlank()) {
-            throw new TranslationException("Azure Translator API key is empty. Set it in Chatglot config.");
+            throw ProviderHttp.configMissing(id(), "Azure Translator API key is empty. Set it in Chatglot config.");
         }
 
         String endpoint = buildEndpoint(config.azureTranslatorEndpoint, request);
@@ -52,31 +48,24 @@ public final class AzureTranslatorTranslationProvider implements TranslationProv
         }
 
         try {
-            HttpResponse<String> response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "Azure Translator request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
-            }
+            HttpResponse<String> response = ProviderHttp.send(requestBuilder.build(), id(), "Azure Translator");
+            ProviderHttp.requireSuccess(response, id(), "Azure Translator");
 
-            JsonArray root = JsonParser.parseString(response.body()).getAsJsonArray();
+            JsonArray root = ProviderHttp.parseJson(response.body(), id(), "Azure Translator").getAsJsonArray();
             if (root.isEmpty()) {
-                throw new TranslationException("Azure Translator returned no translations.");
+                throw ProviderHttp.badResponse(id(), "Azure Translator returned no translations.", response.body());
             }
 
             JsonObject firstItem = root.get(0).getAsJsonObject();
             JsonArray translations = firstItem.getAsJsonArray("translations");
             if (translations == null || translations.isEmpty()) {
-                throw new TranslationException("Azure Translator response has no translation entries.");
+                throw ProviderHttp.badResponse(id(), "Azure Translator response has no translation entries.", response.body());
             }
 
             JsonObject firstTranslation = translations.get(0).getAsJsonObject();
             String translated = firstTranslation.has("text") ? firstTranslation.get("text").getAsString() : "";
             if (translated.isBlank()) {
-                throw new TranslationException("Azure Translator returned empty output.");
+                throw ProviderHttp.emptyOutput(id(), "Azure Translator returned empty output.");
             }
 
             String detected = request.sourceLanguageHint();
@@ -90,8 +79,8 @@ public final class AzureTranslatorTranslationProvider implements TranslationProv
             return new TranslationResult(translated, detected, id());
         } catch (TranslationException e) {
             throw e;
-        } catch (Exception e) {
-            throw new TranslationException("Azure Translator request failed", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "Azure Translator returned an invalid response.", e.getMessage());
         }
     }
 

@@ -16,6 +16,7 @@ Client-side only. No server installation is required.
 - Translate a specific message with `/chatglot translate <id>`
 - Aim at a sign or hanging sign and press `G` (rebindable) to translate its visible face in a lower-screen panel. Looking away dismisses it after 0.8 seconds; the sign itself is unchanged.
 - Sign translation is manual and uses the selected provider. External providers receive the visible face's text; repeated translations reuse a cache for the current world session.
+- In a written book or lectern, press `G` or the small `Translate` button to translate the current page only. Press again to switch between translation and original; changing pages never sends a request automatically.
 
 ---
 
@@ -76,6 +77,8 @@ Key settings:
 ## Privacy Notice — External Data Transmission
 
 **This mod sends chat text to external translation services.** The destination depends on the provider you select.
+
+Manually translating a sign sends its visible text to the selected provider. Manually translating a book page sends only that page's text to the selected provider. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
 
 - **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).

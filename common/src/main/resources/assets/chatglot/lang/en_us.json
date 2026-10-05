@@ -81,6 +81,8 @@
   "chatglot.config.overwrite_translation": "Replace original chat with translation",
   "chatglot.config.show_translation_prefix": "Show translation prefix",
   "chatglot.config.preserve_leading_speaker_prefix": "Exclude leading <username> from translation",
+  "chatglot.config.show_book_translate_button": "Show book translation button",
+  "chatglot.config.show_book_translate_button.description": "Written books and lecterns can still be translated with G when this is off. Writable books only have the button, so turning it off disables translation there.",
   "chatglot.config.target_language": "Target language",
   "chatglot.config.target_language.default": "Default (%s)",
   "chatglot.config.provider": "Provider",

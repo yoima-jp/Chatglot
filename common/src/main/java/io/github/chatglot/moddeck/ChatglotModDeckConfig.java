@@ -409,6 +409,12 @@ function jsonResponse(data) {
             "chatglot.config.preserve_leading_speaker_prefix",
             config.preserveLeadingSpeakerPrefix
         );
+        BooleanOption showBookTranslateButton = new BooleanOption(
+            "show_book_translate_button",
+            ConfigText.translatable("chatglot.config.show_book_translate_button"),
+            ConfigText.translatable("chatglot.config.show_book_translate_button.description"),
+            config.showBookTranslateButton
+        );
         BooleanOption useSharedAppData = booleanOption(
             "use_shared_appdata_settings",
             "chatglot.config.use_shared_appdata_settings",
@@ -558,6 +564,7 @@ function jsonResponse(data) {
             .addOption(overwriteOriginal)
             .addOption(showTranslationPrefix)
             .addOption(preserveSpeakerPrefix)
+            .addOption(showBookTranslateButton)
             .addOption(useSharedAppData)
             .addOption(requestTimeout)
             .addOption(maxConcurrent)
@@ -735,6 +742,7 @@ function jsonResponse(data) {
             case "overwrite_translation" -> config.overwriteOriginalWithTranslation = (Boolean) draft;
             case "show_translation_prefix" -> config.showTranslationPrefix = (Boolean) draft;
             case "preserve_leading_speaker_prefix" -> config.preserveLeadingSpeakerPrefix = (Boolean) draft;
+            case "show_book_translate_button" -> config.showBookTranslateButton = (Boolean) draft;
             case "use_shared_appdata_settings" -> config.useSharedAppDataSettings = (Boolean) draft;
             case "request_timeout" -> config.requestTimeoutSeconds = (Integer) draft;
             case "max_concurrent_translations" -> config.maxConcurrentTranslations = (Integer) draft;

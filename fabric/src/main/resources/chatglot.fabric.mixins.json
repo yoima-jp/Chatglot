@@ -3,6 +3,7 @@
   "package": "io.github.chatglot.fabric.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
+    "BookEditScreenAccessor",
     "BookViewScreenAccessor",
     "BookViewScreenMixin"
   ],

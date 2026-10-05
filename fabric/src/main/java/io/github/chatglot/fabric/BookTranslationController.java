@@ -2,11 +2,12 @@ package io.github.chatglot.fabric;
 
 import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.client.BookTranslationState;
-import io.github.chatglot.client.TranslationErrorMessages;
 import io.github.chatglot.client.BookTranslationState.Key;
 import io.github.chatglot.client.BookTranslationState.Request;
 import io.github.chatglot.client.BookTranslationState.Status;
+import io.github.chatglot.client.TranslationErrorMessages;
 import io.github.chatglot.config.ChatglotConfig;
+import io.github.chatglot.fabric.mixin.BookEditScreenAccessor;
 import io.github.chatglot.fabric.mixin.BookViewScreenAccessor;
 import io.github.chatglot.translation.LanguageUtil;
 import java.util.ArrayList;
@@ -23,8 +24,11 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.MultiLineEditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.BookEditScreen;
 import net.minecraft.client.gui.screens.inventory.BookViewScreen;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.network.chat.Component;
@@ -34,11 +38,12 @@ public final class BookTranslationController {
     private static final int PAGE_TEXT_WIDTH = 114;
     private static final int PAGE_TEXT_HEIGHT = 128;
     private static final float MIN_TEXT_SCALE = 0.65f;
-    private static final int BUTTON_WIDTH = 96;
+    private static final int MENU_ROW_FALLBACK_WIDTH = 200;
+    private static final int MENU_ROW_GAP = 4;
     private static BookTranslationController instance;
 
     private final KeyMapping translateKey;
-    private final Map<BookViewScreen, ScreenState> screens = new WeakHashMap<>();
+    private final Map<Screen, ScreenState> screens = new WeakHashMap<>();
 
     private BookTranslationController(KeyMapping translateKey) {
         this.translateKey = translateKey;
@@ -51,59 +56,99 @@ public final class BookTranslationController {
     }
 
     private void afterInit(Minecraft client, Screen screen, int scaledWidth, int scaledHeight) {
-        if (!(screen instanceof BookViewScreen book)) {
+        if (!supportsTranslation(screen)) {
             return;
         }
 
         ChatglotConfig config = ChatglotRuntime.get().configManager().get();
-        ScreenState state = screens.get(book);
+        ScreenState state = screens.get(screen);
         if (state == null) {
             state = new ScreenState(client.level, config);
-            screens.put(book, state);
-            registerScreenEvents(book, state);
+            screens.put(screen, state);
+            registerScreenEvents(screen, state);
         } else {
-            refreshContext(client, book, state);
+            refreshContext(client, screen, state);
         }
-        addTranslateButton(book, state);
-        updateButton(client, book, state);
+
+        // Screen init rebuilds the vanilla widgets, so recreate our button only when enabled.
+        state.button = null;
+        if (config.showBookTranslateButton) {
+            addTranslateButton(screen, state);
+        }
+        updateButton(client, screen, state);
+        syncEditablePage(screen, state);
     }
 
-    private void registerScreenEvents(BookViewScreen screen, ScreenState state) {
+    private static boolean supportsTranslation(Screen screen) {
+        return screen instanceof BookViewScreen || screen instanceof BookEditScreen;
+    }
+
+    private void registerScreenEvents(Screen screen, ScreenState state) {
         ScreenEvents.afterTick(screen).register(ignored -> tick(screen, state));
         ScreenEvents.afterExtract(screen).register((ignored, graphics, mouseX, mouseY, delta) ->
             renderPage(screen, state, graphics));
-        ScreenKeyboardEvents.beforeKeyPress(screen).register((ignored, event) -> {
-            if (translateKey.matches(event)) {
-                activate(Minecraft.getInstance(), screen, state);
-            }
-        });
+        if (screen instanceof BookViewScreen) {
+            ScreenKeyboardEvents.beforeKeyPress(screen).register((ignored, event) -> {
+                if (translateKey.matches(event)) {
+                    activate(Minecraft.getInstance(), screen, state);
+                }
+            });
+        }
+        // BookEditScreen uses G as ordinary page input; translation there is button-only.
         ScreenEvents.remove(screen).register(ignored -> remove(screen, state));
     }
 
-    private void addTranslateButton(BookViewScreen screen, ScreenState state) {
-        BookViewScreenAccessor access = (BookViewScreenAccessor) screen;
-        int x = (screen.width - BUTTON_WIDTH) / 2;
-        // The final 20 pixels of the book image are below the page text and page-turn
-        // controls, leaving the existing Done and Take Book controls in their vanilla row.
-        int y = access.chatglot$menuControlsTop() - 24;
+    private void addTranslateButton(Screen screen, ScreenState state) {
+        ButtonRow row = findMenuButtonRow(screen);
+        // Match the displayed vanilla row, including the lectern's optional Take Book button,
+        // then keep the usual 20-pixel button height and 4-pixel vertical gap.
+        int y = Math.min(row.y() + Button.DEFAULT_HEIGHT + MENU_ROW_GAP,
+            Math.max(0, screen.height - Button.DEFAULT_HEIGHT));
         Button button = Button.builder(Component.translatable("chatglot.book.translate"),
                 ignored -> activate(Minecraft.getInstance(), screen, state))
-            .pos(x, y)
-            .width(BUTTON_WIDTH)
+            .pos(row.x(), y)
+            .width(row.width())
             .build();
         Screens.getWidgets(screen).add(button);
         state.button = button;
     }
 
-    private void tick(BookViewScreen screen, ScreenState state) {
+    private static ButtonRow findMenuButtonRow(Screen screen) {
+        int rowY = menuControlsTop(screen);
+        int left = Integer.MAX_VALUE;
+        int right = Integer.MIN_VALUE;
+        for (AbstractWidget widget : Screens.getWidgets(screen)) {
+            if (widget instanceof Button button && button.visible && button.getY() == rowY) {
+                left = Math.min(left, button.getX());
+                right = Math.max(right, button.getX() + button.getWidth());
+            }
+        }
+
+        if (right <= left) {
+            // Vanilla's Done row and BookEditScreen's two-button row are both 200 pixels wide.
+            left = (screen.width - MENU_ROW_FALLBACK_WIDTH) / 2;
+            right = left + MENU_ROW_FALLBACK_WIDTH;
+        }
+        return new ButtonRow(left, right - left, rowY);
+    }
+
+    private static int menuControlsTop(Screen screen) {
+        if (screen instanceof BookViewScreen) {
+            return ((BookViewScreenAccessor) screen).chatglot$menuControlsTop();
+        }
+        return ((BookEditScreenAccessor) screen).chatglot$menuControlsTop();
+    }
+
+    private void tick(Screen screen, ScreenState state) {
         Minecraft client = Minecraft.getInstance();
         refreshContext(client, screen, state);
         state.translation.observe(currentKey(screen, state.settings));
+        syncEditablePage(screen, state);
         updateButton(client, screen, state);
         updateNarration(client, screen, state);
     }
 
-    private void refreshContext(Minecraft client, BookViewScreen screen, ScreenState state) {
+    private void refreshContext(Minecraft client, Screen screen, ScreenState state) {
         ChatglotConfig config = ChatglotRuntime.get().configManager().get();
         if (client.level != state.level || config != state.settings) {
             state.translation.invalidate();
@@ -115,7 +160,7 @@ public final class BookTranslationController {
         }
     }
 
-    private void updateButton(Minecraft client, BookViewScreen screen, ScreenState state) {
+    private void updateButton(Minecraft client, Screen screen, ScreenState state) {
         if (state.button == null) {
             return;
         }
@@ -130,7 +175,7 @@ public final class BookTranslationController {
         state.button.active = isScreenReady(client, screen, state) && key != null && status != Status.LOADING;
     }
 
-    private void activate(Minecraft client, BookViewScreen screen, ScreenState state) {
+    private void activate(Minecraft client, Screen screen, ScreenState state) {
         refreshContext(client, screen, state);
         if (!isScreenReady(client, screen, state)) {
             return;
@@ -143,6 +188,7 @@ public final class BookTranslationController {
         }
 
         Request request = state.translation.activate(key);
+        syncEditablePage(screen, state);
         updateButton(client, screen, state);
         updateNarration(client, screen, state);
         if (request != null) {
@@ -150,7 +196,7 @@ public final class BookTranslationController {
         }
     }
 
-    private void translate(Minecraft client, BookViewScreen screen, ScreenState screenState, Request request) {
+    private void translate(Minecraft client, Screen screen, ScreenState screenState, Request request) {
         BookTranslationState requestedState = screenState.translation;
         ClientLevel requestedLevel = client.level;
         ChatglotConfig requestedSettings = screenState.settings;
@@ -180,17 +226,19 @@ public final class BookTranslationController {
                 if (storedFailure != null && storedFailure != failure) {
                     ChatglotFabric.LOGGER.warn("Book page translation returned an invalid result", storedFailure);
                 }
+                syncEditablePage(screen, screenState);
                 updateButton(client, screen, screenState);
                 updateNarration(client, screen, screenState);
             }));
         } catch (RuntimeException error) {
             ChatglotFabric.LOGGER.warn("Could not start book page translation", error);
             requestedState.complete(request, null, error);
+            syncEditablePage(screen, screenState);
             updateButton(client, screen, screenState);
         }
     }
 
-    private boolean isCurrentRequest(Minecraft client, BookViewScreen screen, ScreenState screenState,
+    private boolean isCurrentRequest(Minecraft client, Screen screen, ScreenState screenState,
                                      BookTranslationState requestedState, ClientLevel requestedLevel,
                                      ChatglotConfig requestedSettings, Key key) {
         ChatglotRuntime runtime = ChatglotRuntime.get();
@@ -202,12 +250,12 @@ public final class BookTranslationController {
             && key.language().equals(LanguageUtil.resolveConfiguredTargetLanguage(currentConfig.targetLanguage));
     }
 
-    private boolean isScreenReady(Minecraft client, BookViewScreen screen, ScreenState state) {
+    private boolean isScreenReady(Minecraft client, Screen screen, ScreenState state) {
         return screens.get(screen) == state && client.level != null && client.gui.screen() == screen
             && ChatglotRuntime.get().configManager().get() == state.settings && state.settings.enabled;
     }
 
-    private void renderPage(BookViewScreen screen, ScreenState state, GuiGraphicsExtractor graphics) {
+    private void renderPage(Screen screen, ScreenState state, GuiGraphicsExtractor graphics) {
         Minecraft client = Minecraft.getInstance();
         if (!isScreenReady(client, screen, state)) {
             return;
@@ -215,9 +263,9 @@ public final class BookTranslationController {
 
         Key key = currentKey(screen, state.settings);
         state.translation.observe(key);
-        BookViewScreenAccessor access = (BookViewScreenAccessor) screen;
-        int left = access.chatglot$backgroundLeft();
-        int top = access.chatglot$backgroundTop();
+        syncEditablePage(screen, state);
+        int left = backgroundLeft(screen);
+        int top = backgroundTop(screen);
         String translated = state.translation.displayedTranslation(key);
         if (translated != null) {
             drawTranslation(client.font, graphics, left + 36, top + 30, translated, 0xFF000000);
@@ -235,6 +283,20 @@ public final class BookTranslationController {
         if (message != null) {
             drawTranslation(client.font, graphics, left + 36, top + 16, message.getString(), 0xFF8B1A1A);
         }
+    }
+
+    private static int backgroundLeft(Screen screen) {
+        if (screen instanceof BookViewScreen) {
+            return ((BookViewScreenAccessor) screen).chatglot$backgroundLeft();
+        }
+        return ((BookEditScreenAccessor) screen).chatglot$backgroundLeft();
+    }
+
+    private static int backgroundTop(Screen screen) {
+        if (screen instanceof BookViewScreen) {
+            return ((BookViewScreenAccessor) screen).chatglot$backgroundTop();
+        }
+        return ((BookEditScreenAccessor) screen).chatglot$backgroundTop();
     }
 
     private static void drawTranslation(
@@ -283,7 +345,37 @@ public final class BookTranslationController {
         return text.toString();
     }
 
-    private void updateNarration(Minecraft client, BookViewScreen screen, ScreenState state) {
+    private void syncEditablePage(Screen screen, ScreenState state) {
+        if (!(screen instanceof BookEditScreen)) {
+            return;
+        }
+
+        MultiLineEditBox page = ((BookEditScreenAccessor) screen).chatglot$getPage();
+        Key key = currentKey(screen, state.settings);
+        boolean translated = state.translation.isTranslationVisible(key)
+            && isScreenReady(Minecraft.getInstance(), screen, state);
+        if (translated) {
+            // The vanilla value listener writes every edit into pages, which saveChanges sends
+            // to both the local ItemStack and the server. Hiding and disabling the widget keeps
+            // translated text strictly presentational and prevents typing from reaching it.
+            page.visible = false;
+            page.active = false;
+            if (screen.getFocused() == page) {
+                screen.clearFocus();
+            }
+            state.editablePageSuppressed = true;
+        } else if (state.editablePageSuppressed) {
+            page.visible = true;
+            page.active = true;
+            screen.setFocused(page);
+            state.editablePageSuppressed = false;
+        } else {
+            page.visible = true;
+            page.active = true;
+        }
+    }
+
+    private void updateNarration(Minecraft client, Screen screen, ScreenState state) {
         if (!isScreenReady(client, screen, state)) {
             return;
         }
@@ -301,28 +393,46 @@ public final class BookTranslationController {
         }
     }
 
-    private Key currentKey(BookViewScreen screen, ChatglotConfig config) {
+    private Key currentKey(Screen screen, ChatglotConfig config) {
         if (!config.enabled) {
             return null;
         }
-        BookViewScreen.BookAccess book = ((BookViewScreenAccessor) screen).chatglot$getBookAccess();
-        int pageIndex = ((BookViewScreenAccessor) screen).chatglot$getCurrentPage();
-        if (pageIndex < 0 || pageIndex >= book.getPageCount()) {
+
+        String text;
+        if (screen instanceof BookViewScreen bookScreen) {
+            BookViewScreen.BookAccess book = ((BookViewScreenAccessor) bookScreen).chatglot$getBookAccess();
+            int pageIndex = ((BookViewScreenAccessor) bookScreen).chatglot$getCurrentPage();
+            if (pageIndex < 0 || pageIndex >= book.getPageCount()) {
+                return null;
+            }
+            text = book.getPage(pageIndex).getString();
+        } else if (screen instanceof BookEditScreen editScreen) {
+            BookEditScreenAccessor access = (BookEditScreenAccessor) editScreen;
+            List<String> pages = access.chatglot$getPages();
+            int pageIndex = access.chatglot$getCurrentPage();
+            if (pageIndex < 0 || pageIndex >= pages.size()) {
+                return null;
+            }
+            // BookEditScreen's value listener keeps this list current before any save action.
+            text = pages.get(pageIndex);
+        } else {
             return null;
         }
-        String text = book.getPage(pageIndex).getString().strip();
+
+        text = text.strip();
         if (text.isBlank() || text.length() > 4096) {
             return null;
         }
         return new Key(text, LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage), config.provider);
     }
 
-    private void remove(BookViewScreen screen, ScreenState state) {
+    private void remove(Screen screen, ScreenState state) {
         if (screens.remove(screen, state)) {
             state.translation.invalidate();
             state.narratedKey = null;
             state.narratedText = null;
             state.button = null;
+            state.editablePageSuppressed = false;
         }
     }
 
@@ -348,6 +458,8 @@ public final class BookTranslationController {
             && controller.isScreenReady(Minecraft.getInstance(), screen, state);
     }
 
+    private record ButtonRow(int x, int width, int y) { }
+
     private static final class ScreenState {
         private BookTranslationState translation = new BookTranslationState();
         private ClientLevel level;
@@ -355,6 +467,7 @@ public final class BookTranslationController {
         private Button button;
         private Key narratedKey;
         private String narratedText;
+        private boolean editablePageSuppressed;
 
         private ScreenState(ClientLevel level, ChatglotConfig settings) {
             this.level = level;

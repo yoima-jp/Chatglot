@@ -37,6 +37,7 @@ public class ChatglotConfig {
     public boolean overwriteOriginalWithTranslation = false;
     public boolean showTranslationPrefix = true;
     public boolean preserveLeadingSpeakerPrefix = true;
+    public boolean showBookTranslateButton = true;
     public String targetLanguage = "EN";
     public boolean showSourceLanguageTag = true;
 
@@ -93,6 +94,7 @@ public class ChatglotConfig {
         copy.overwriteOriginalWithTranslation = overwriteOriginalWithTranslation;
         copy.showTranslationPrefix = showTranslationPrefix;
         copy.preserveLeadingSpeakerPrefix = preserveLeadingSpeakerPrefix;
+        copy.showBookTranslateButton = showBookTranslateButton;
         copy.targetLanguage = targetLanguage;
         copy.showSourceLanguageTag = showSourceLanguageTag;
         copy.provider = provider;
@@ -144,6 +146,7 @@ public class ChatglotConfig {
         overwriteOriginalWithTranslation = other.overwriteOriginalWithTranslation;
         showTranslationPrefix = other.showTranslationPrefix;
         preserveLeadingSpeakerPrefix = other.preserveLeadingSpeakerPrefix;
+        showBookTranslateButton = other.showBookTranslateButton;
         targetLanguage = other.targetLanguage;
         showSourceLanguageTag = other.showSourceLanguageTag;
         provider = other.provider;

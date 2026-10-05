@@ -81,6 +81,8 @@
   "chatglot.config.overwrite_translation": "翻訳結果で原文チャットを置換",
   "chatglot.config.show_translation_prefix": "翻訳プレフィックスを表示",
   "chatglot.config.preserve_leading_speaker_prefix": "先頭の <ユーザー名> を翻訳対象から外す",
+  "chatglot.config.show_book_translate_button": "本の翻訳ボタンを表示",
+  "chatglot.config.show_book_translate_button.description": "オフでも記入済みの本と書見台は G キーで翻訳できます。本と羽根ペンはボタンのみで操作するため、オフにすると翻訳できません。",
   "chatglot.config.target_language": "翻訳先言語",
   "chatglot.config.target_language.default": "デフォルト (%s)",
   "chatglot.config.provider": "プロバイダ",

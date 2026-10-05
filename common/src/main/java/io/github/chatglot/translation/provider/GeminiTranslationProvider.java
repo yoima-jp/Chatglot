@@ -2,7 +2,6 @@ package io.github.chatglot.translation.provider;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.TranslationException;
 import io.github.chatglot.translation.TranslationProvider;
@@ -10,7 +9,6 @@ import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
 import java.net.URLEncoder;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +19,6 @@ public final class GeminiTranslationProvider implements TranslationProvider {
     private static final String GEMINI_ENDPOINT_TEMPLATE =
         "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s";
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-
     @Override
     public String id() {
         return "gemini";
@@ -32,7 +28,7 @@ public final class GeminiTranslationProvider implements TranslationProvider {
     public TranslationResult translate(TranslationRequest request, ChatglotConfig config, Path configDir, Path gameDir)
         throws TranslationException {
         if (config.geminiApiKey == null || config.geminiApiKey.isBlank()) {
-            throw new TranslationException("Gemini API key is empty. Set it in Chatglot config.");
+            throw ProviderHttp.configMissing(id(), "Gemini API key is empty. Set it in Chatglot config.");
         }
 
         String endpoint = String.format(
@@ -63,27 +59,20 @@ public final class GeminiTranslationProvider implements TranslationProvider {
             .build();
 
         try {
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "Gemini request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
-            }
+            HttpResponse<String> response = ProviderHttp.send(httpRequest, id(), "Gemini");
+            ProviderHttp.requireSuccess(response, id(), "Gemini");
 
-            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject root = ProviderHttp.parseJson(response.body(), id(), "Gemini").getAsJsonObject();
             String translated = extractTranslatedText(root);
             if (translated.isBlank()) {
-                throw new TranslationException("Gemini returned empty output.");
+                throw ProviderHttp.emptyOutput(id(), "Gemini returned empty output.");
             }
 
             return new TranslationResult(translated, request.sourceLanguageHint(), id());
         } catch (TranslationException e) {
             throw e;
-        } catch (Exception e) {
-            throw new TranslationException("Gemini request failed", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "Gemini returned an invalid response.", e.getMessage());
         }
     }
 
@@ -105,21 +94,21 @@ public final class GeminiTranslationProvider implements TranslationProvider {
             if (root.has("promptFeedback") && root.get("promptFeedback").isJsonObject()) {
                 JsonObject feedback = root.getAsJsonObject("promptFeedback");
                 if (feedback.has("blockReason")) {
-                    throw new TranslationException("Gemini blocked the prompt: " + feedback.get("blockReason").getAsString());
+                    throw ProviderHttp.badResponse("gemini", "Gemini blocked the prompt.", feedback.toString());
                 }
             }
-            throw new TranslationException("Gemini returned no candidates.");
+            throw ProviderHttp.badResponse("gemini", "Gemini returned no candidates.", root.toString());
         }
 
         JsonObject first = candidates.get(0).getAsJsonObject();
         JsonObject content = first.getAsJsonObject("content");
         if (content == null) {
-            throw new TranslationException("Gemini response has no content.");
+            throw ProviderHttp.badResponse("gemini", "Gemini response has no content.", first.toString());
         }
 
         JsonArray parts = content.getAsJsonArray("parts");
         if (parts == null || parts.isEmpty()) {
-            throw new TranslationException("Gemini response has no text parts.");
+            throw ProviderHttp.badResponse("gemini", "Gemini response has no text parts.", content.toString());
         }
 
         StringBuilder builder = new StringBuilder();

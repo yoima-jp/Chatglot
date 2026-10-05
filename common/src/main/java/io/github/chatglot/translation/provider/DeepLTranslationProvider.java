@@ -2,14 +2,12 @@ package io.github.chatglot.translation.provider;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.TranslationException;
 import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -21,8 +19,6 @@ public final class DeepLTranslationProvider implements TranslationProvider {
     private static final String DEEPL_PRO_ENDPOINT = "https://api.deepl.com/v2/translate";
     private static final String AUTH_HEADER_PREFIX = "DeepL-Auth-Key ";
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-
     @Override
     public String id() {
         return "deepl";
@@ -32,7 +28,7 @@ public final class DeepLTranslationProvider implements TranslationProvider {
     public TranslationResult translate(TranslationRequest request, ChatglotConfig config, Path configDir, Path gameDir)
         throws TranslationException {
         if (config.deeplApiKey == null || config.deeplApiKey.isBlank()) {
-            throw new TranslationException("DeepL API key is empty. Set it in Chatglot config.");
+            throw ProviderHttp.configMissing(id(), "DeepL API key is empty. Set it in Chatglot config.");
         }
 
         JsonObject payload = new JsonObject();
@@ -53,24 +49,20 @@ public final class DeepLTranslationProvider implements TranslationProvider {
             .build();
 
         try {
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "DeepL request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
-            }
+            HttpResponse<String> response = ProviderHttp.send(httpRequest, id(), "DeepL");
+            ProviderHttp.requireSuccess(response, id(), "DeepL");
 
-            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject root = ProviderHttp.parseJson(response.body(), id(), "DeepL").getAsJsonObject();
             JsonArray translations = root.getAsJsonArray("translations");
             if (translations == null || translations.isEmpty()) {
-                throw new TranslationException("DeepL returned no translations.");
+                throw ProviderHttp.badResponse(id(), "DeepL returned no translations.", response.body());
             }
 
             JsonObject first = translations.get(0).getAsJsonObject();
             String translated = first.get("text").getAsString();
+            if (translated.isBlank()) {
+                throw ProviderHttp.emptyOutput(id(), "DeepL returned empty output.");
+            }
             String detected = first.has("detected_source_language")
                 ? first.get("detected_source_language").getAsString()
                 : request.sourceLanguageHint();
@@ -78,8 +70,8 @@ public final class DeepLTranslationProvider implements TranslationProvider {
             return new TranslationResult(translated, detected, id());
         } catch (TranslationException e) {
             throw e;
-        } catch (Exception e) {
-            throw new TranslationException("DeepL request failed", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "DeepL returned an invalid response.", e.getMessage());
         }
     }
 

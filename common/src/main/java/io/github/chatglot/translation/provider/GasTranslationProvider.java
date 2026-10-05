@@ -1,14 +1,12 @@
 package io.github.chatglot.translation.provider;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.TranslationException;
 import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +16,6 @@ import java.util.Locale;
 
 public final class GasTranslationProvider implements TranslationProvider {
     private static final int MAX_REDIRECTS = 5;
-    private final HttpClient httpClient = HttpClient.newHttpClient();
 
     @Override
     public String id() {
@@ -30,7 +27,7 @@ public final class GasTranslationProvider implements TranslationProvider {
         throws TranslationException {
         String endpoint = resolveEndpoint(config);
         if (endpoint.isBlank()) {
-            throw new TranslationException("GAS Web App URL is empty. Set it in Chatglot config.");
+            throw ProviderHttp.configMissing(id(), "GAS Web App URL is empty. Set it in Chatglot config.");
         }
 
         JsonObject payload = new JsonObject();
@@ -46,35 +43,43 @@ public final class GasTranslationProvider implements TranslationProvider {
                 payload.toString(),
                 config.requestTimeoutSeconds
             );
-            if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "GAS translation request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
-            }
+            ProviderHttp.requireSuccess(response, id(), "GAS");
 
             String responseBody = response.body() == null ? "" : response.body();
             String normalizedBody = normalizeJsonBody(responseBody);
 
             JsonObject root;
             try {
-                root = JsonParser.parseString(normalizedBody).getAsJsonObject();
-            } catch (RuntimeException parseError) {
-                throw new TranslationException(
-                    buildNonJsonResponseMessage(response, responseBody),
-                    parseError
-                );
+                root = ProviderHttp.parseJson(normalizedBody, id(), "GAS").getAsJsonObject();
+            } catch (TranslationException parseError) {
+                if (parseError.kind() == TranslationException.Kind.BAD_RESPONSE) {
+                    throw ProviderHttp.badResponse(id(), "GAS returned a non-JSON response.", buildNonJsonResponseMessage(response, responseBody));
+                }
+                throw parseError;
             }
 
             if (root.has("ok") && !root.get("ok").getAsBoolean()) {
-                throw new TranslationException("GAS translation failed: " + extractErrorMessage(root));
+                String detail = extractErrorMessage(root);
+                String normalizedError = (detail + " " + root).toLowerCase(Locale.ROOT);
+                boolean rateLimited = normalizedError.contains("rate limit")
+                    || normalizedError.contains("rate_limit")
+                    || normalizedError.contains("too many requests")
+                    || normalizedError.contains("429")
+                    || normalizedError.contains("resource_exhausted");
+                throw TranslationException.classified(
+                    rateLimited ? TranslationException.Kind.RATE_LIMITED : TranslationException.Kind.SERVER,
+                    "GAS translation failed.",
+                    id(),
+                    null,
+                    null,
+                    ProviderHttp.maskAndLimit(detail),
+                    null
+                );
             }
 
             String translated = getString(root, "translatedText");
             if (translated.isBlank()) {
-                throw new TranslationException("GAS translation returned empty output.");
+                throw ProviderHttp.emptyOutput(id(), "GAS translation returned empty output.");
             }
 
             String detected = getString(root, "source");
@@ -85,8 +90,8 @@ public final class GasTranslationProvider implements TranslationProvider {
             return new TranslationResult(translated, detected, id());
         } catch (TranslationException e) {
             throw e;
-        } catch (Exception e) {
-            throw new TranslationException("GAS translation request failed", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "GAS returned an invalid response.", e.getMessage());
         }
     }
 
@@ -103,7 +108,8 @@ public final class GasTranslationProvider implements TranslationProvider {
         return config.gasWebAppUrl.trim();
     }
 
-    private HttpResponse<String> sendWithRedirects(String url, String requestBody, int timeoutSeconds) throws Exception {
+    private HttpResponse<String> sendWithRedirects(String url, String requestBody, int timeoutSeconds)
+        throws TranslationException {
         URI currentUri = URI.create(url);
         boolean usePost = true;
 
@@ -120,7 +126,7 @@ public final class GasTranslationProvider implements TranslationProvider {
                 request = builder.GET().build();
             }
 
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            HttpResponse<String> response = ProviderHttp.send(request, id(), "GAS");
             int status = response.statusCode();
             if (status < 300 || status >= 400) {
                 return response;
@@ -138,7 +144,7 @@ public final class GasTranslationProvider implements TranslationProvider {
             currentUri = currentUri.resolve(location.trim());
         }
 
-        throw new TranslationException("GAS translation request failed: too many redirects.");
+        throw ProviderHttp.badResponse(id(), "GAS exceeded the redirect limit.", null);
     }
 
     private static String normalizeJsonBody(String body) {
@@ -220,7 +226,7 @@ public final class GasTranslationProvider implements TranslationProvider {
     private static String extractErrorMessage(JsonObject root) {
         String message = getString(root, "message");
         String details = getString(root, "details");
-        String error = getString(root, "error");
+        String error = errorDetail(root.get("error"));
 
         StringBuilder builder = new StringBuilder();
         if (!error.isBlank()) {
@@ -243,6 +249,25 @@ public final class GasTranslationProvider implements TranslationProvider {
             return "Unknown GAS error response.";
         }
         return builder.toString();
+    }
+
+    private static String errorDetail(com.google.gson.JsonElement value) {
+        if (value == null || value.isJsonNull()) {
+            return "";
+        }
+        if (value.isJsonPrimitive()) {
+            return value.getAsString().trim();
+        }
+        if (value.isJsonObject()) {
+            JsonObject error = value.getAsJsonObject();
+            String message = getString(error, "message");
+            String code = getString(error, "code");
+            if (message.isBlank()) {
+                return code;
+            }
+            return code.isBlank() ? message : code + " - " + message;
+        }
+        return value.toString();
     }
 
     private static String getString(JsonObject root, String key) {

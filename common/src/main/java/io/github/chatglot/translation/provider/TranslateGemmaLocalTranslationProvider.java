@@ -3,7 +3,6 @@ package io.github.chatglot.translation.provider;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.localbackend.LocalBackendManager;
 import io.github.chatglot.localbackend.LocalBackendStatus;
@@ -12,7 +11,6 @@ import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +20,6 @@ import java.util.List;
 import java.util.Locale;
 
 public final class TranslateGemmaLocalTranslationProvider implements TranslationProvider {
-    private final HttpClient httpClient = HttpClient.newHttpClient();
     private final LocalBackendManager backendManager;
 
     public TranslateGemmaLocalTranslationProvider(LocalBackendManager backendManager) {
@@ -39,7 +36,11 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
         throws TranslationException {
         LocalBackendStatus status = backendManager.checkStatus(config);
         if (!status.healthy()) {
-            throw new TranslationException("Local backend unavailable: " + status.message().getString());
+            throw TranslationException.classified(
+                TranslationException.Kind.NETWORK,
+                "Local backend is unavailable.",
+                id(), null, null, ProviderHttp.maskAndLimit(status.message().getString()), null
+            );
         }
 
         JsonObject payload = new JsonObject();
@@ -60,26 +61,19 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
             .build();
 
         try {
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "Local backend request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
-            }
+            HttpResponse<String> response = ProviderHttp.send(httpRequest, id(), "Local backend");
+            ProviderHttp.requireSuccess(response, id(), "Local backend");
 
-            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject root = ProviderHttp.parseJson(response.body(), id(), "Local backend").getAsJsonObject();
             String translated = extractTranslatedText(root);
             if (translated.isBlank()) {
-                throw new TranslationException("Local backend returned empty translation.");
+                throw ProviderHttp.emptyOutput(id(), "Local backend returned empty translation.");
             }
             return new TranslationResult(translated, request.sourceLanguageHint(), id());
         } catch (TranslationException e) {
             throw e;
-        } catch (Exception e) {
-            throw new TranslationException("Local backend request failed", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "Local backend returned an invalid response.", e.getMessage());
         }
     }
 
@@ -151,12 +145,12 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
 
         JsonArray choices = root.getAsJsonArray("choices");
         if (choices == null || choices.isEmpty()) {
-            throw new TranslationException("Local backend returned no choices.");
+            throw ProviderHttp.badResponse("translategemma_local", "Local backend returned no choices.", root.toString());
         }
 
         JsonElement first = choices.get(0);
         if (!first.isJsonObject()) {
-            throw new TranslationException("Local backend returned an invalid response.");
+            throw ProviderHttp.badResponse("translategemma_local", "Local backend returned an invalid response.", root.toString());
         }
         JsonObject firstObject = first.getAsJsonObject();
         JsonElement content = null;
@@ -167,7 +161,7 @@ public final class TranslateGemmaLocalTranslationProvider implements Translation
             content = firstObject.get("text");
         }
         if (content == null) {
-            throw new TranslationException("Local backend response missing content.");
+            throw ProviderHttp.badResponse("translategemma_local", "Local backend response is missing content.", root.toString());
         }
 
         if (content.isJsonPrimitive()) {

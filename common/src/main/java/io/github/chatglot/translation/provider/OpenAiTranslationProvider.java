@@ -3,14 +3,12 @@ package io.github.chatglot.translation.provider;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.TranslationException;
 import io.github.chatglot.translation.TranslationProvider;
 import io.github.chatglot.translation.TranslationRequest;
 import io.github.chatglot.translation.TranslationResult;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -22,8 +20,6 @@ public final class OpenAiTranslationProvider implements TranslationProvider {
     private static final String SYSTEM_PROMPT =
         "You are a translation engine for Minecraft chat messages. Return only translated text without explanations.";
 
-    private final HttpClient httpClient = HttpClient.newHttpClient();
-
     @Override
     public String id() {
         return "openai";
@@ -33,7 +29,7 @@ public final class OpenAiTranslationProvider implements TranslationProvider {
     public TranslationResult translate(TranslationRequest request, ChatglotConfig config, Path configDir, Path gameDir)
         throws TranslationException {
         if (config.openaiApiKey == null || config.openaiApiKey.isBlank()) {
-            throw new TranslationException("OpenAI API key is empty. Set it in Chatglot config.");
+            throw ProviderHttp.configMissing(id(), "OpenAI API key is empty. Set it in Chatglot config.");
         }
 
         JsonObject payload = new JsonObject();
@@ -71,27 +67,20 @@ public final class OpenAiTranslationProvider implements TranslationProvider {
             .build();
 
         try {
-            HttpResponse<String> response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-            if (response.statusCode() >= 400) {
-                throw new TranslationException(
-                    "OpenAI request failed ("
-                        + response.statusCode()
-                        + "): "
-                        + TranslationPromptBuilder.abbreviate(response.body(), 500)
-                );
-            }
+            HttpResponse<String> response = ProviderHttp.send(httpRequest, id(), "OpenAI");
+            ProviderHttp.requireSuccess(response, id(), "OpenAI");
 
-            JsonObject root = JsonParser.parseString(response.body()).getAsJsonObject();
+            JsonObject root = ProviderHttp.parseJson(response.body(), id(), "OpenAI").getAsJsonObject();
             String translated = extractTranslatedText(root);
             if (translated.isBlank()) {
-                throw new TranslationException("OpenAI returned empty output.");
+                throw ProviderHttp.emptyOutput(id(), "OpenAI returned empty output.");
             }
 
             return new TranslationResult(translated, request.sourceLanguageHint(), id());
         } catch (TranslationException e) {
             throw e;
-        } catch (Exception e) {
-            throw new TranslationException("OpenAI request failed", e);
+        } catch (RuntimeException e) {
+            throw ProviderHttp.badResponse(id(), "OpenAI returned an invalid response.", e.getMessage());
         }
     }
 
@@ -109,7 +98,7 @@ public final class OpenAiTranslationProvider implements TranslationProvider {
 
         JsonArray output = root.getAsJsonArray("output");
         if (output == null || output.isEmpty()) {
-            throw new TranslationException("OpenAI returned no output.");
+            throw ProviderHttp.badResponse("openai", "OpenAI returned no output.", root.toString());
         }
 
         StringBuilder builder = new StringBuilder();

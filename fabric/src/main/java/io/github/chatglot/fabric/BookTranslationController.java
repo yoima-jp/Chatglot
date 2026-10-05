@@ -65,10 +65,13 @@ public final class BookTranslationController {
         if (state == null) {
             state = new ScreenState(client.level, config);
             screens.put(screen, state);
-            registerScreenEvents(screen, state);
         } else {
             refreshContext(client, screen, state);
         }
+        // Fabric recreates every per-screen event before each init, including resize re-inits.
+        // Registering only once would drop the page renderer while vanilla body text stays
+        // suppressed, leaving a blank translated page after a window resize.
+        registerScreenEvents(screen, state);
 
         // Screen init rebuilds the vanilla widgets, so recreate our button only when enabled.
         state.button = null;

@@ -90,7 +90,7 @@ public final class ChatTranslationService {
 
         TranslationProvider provider = providerOptional.orElseThrow();
         String resolvedSourceHint = LanguageUtil.normalize(sourceLanguageHint);
-        TranslationKey key = new TranslationKey(text, resolvedTargetLanguage, resolvedSourceHint, providerId);
+        TranslationKey key = new TranslationKey(text, resolvedTargetLanguage, resolvedSourceHint, providerId, config);
         CompletableFuture<TranslationResult> shared = inFlight.get(key);
         if (shared != null) {
             return detached(shared);
@@ -267,7 +267,16 @@ public final class ChatTranslationService {
         }
     }
 
-    private record TranslationKey(String text, String targetLanguage, String sourceLanguageHint, String providerId) { }
+    // Saving or reloading config replaces the instance, and ChatglotConfig keeps identity equality.
+    // Including it prevents a request made after a model, endpoint or key change from joining a
+    // provider call that is still running with the previous settings.
+    private record TranslationKey(
+        String text,
+        String targetLanguage,
+        String sourceLanguageHint,
+        String providerId,
+        ChatglotConfig config
+    ) { }
 
     private static final class ChatglotThreadFactory implements ThreadFactory {
         private final AtomicInteger threadCounter = new AtomicInteger(0);

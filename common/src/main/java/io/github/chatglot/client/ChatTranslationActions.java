@@ -6,6 +6,7 @@ import io.github.chatglot.translation.LanguageUtil;
 import io.github.chatglot.translation.TranslationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MessageSignature;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 public final class ChatTranslationActions {
     private static final Logger LOGGER = LoggerFactory.getLogger("Chatglot/Actions");
+    private static final TranslationErrorDisplayLimiter ERROR_DISPLAY_LIMITER = new TranslationErrorDisplayLimiter();
 
     private ChatTranslationActions() {
     }
@@ -48,8 +50,20 @@ public final class ChatTranslationActions {
             .exceptionally(error -> {
                 Throwable unwrapped = unwrap(error);
                 LOGGER.warn("Translation failed", unwrapped);
-                String message = unwrapped.getMessage() == null ? "translation failed" : unwrapped.getMessage();
-                ChatOutput.postError(message);
+                TranslationException failure = TranslationErrorMessages.translationException(unwrapped);
+                TranslationException.Kind kind = failure == null
+                    ? TranslationException.Kind.UNKNOWN
+                    : failure.kind();
+                String providerId = failure != null && failure.providerId() != null
+                    ? failure.providerId()
+                    : config.provider;
+                boolean suppressedByBreaker = failure != null && failure.suppressedByBreaker();
+                boolean breakerTriggered = failure != null && failure.claimBreakerNotice();
+                if (ERROR_DISPLAY_LIMITER.shouldDisplay(
+                    providerId, kind, automatic, suppressedByBreaker, breakerTriggered
+                )) {
+                    ChatOutput.post(TranslationErrorMessages.chat(unwrapped, config.provider, breakerTriggered));
+                }
                 return null;
             });
     }
@@ -72,11 +86,9 @@ public final class ChatTranslationActions {
     }
 
     private static Throwable unwrap(Throwable throwable) {
-        if (throwable instanceof CompletionException completionException && completionException.getCause() != null) {
-            return completionException.getCause();
-        }
-        if (throwable instanceof TranslationException) {
-            return throwable;
+        while ((throwable instanceof CompletionException || throwable instanceof ExecutionException)
+            && throwable.getCause() != null) {
+            throwable = throwable.getCause();
         }
         return throwable;
     }

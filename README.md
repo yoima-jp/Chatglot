@@ -39,6 +39,8 @@ The project focuses on practical choice and transparency:
 - Result shown as a new line **or** replaces the original chat message
 - Open the settings screen with `F8` or `/chatglot config`
 - Translate a specific message with `/chatglot translate <id>`
+- Run `/chatglot diagnose` to send the test text `Hello` to the selected provider and show the translation time and result. For TranslateGemma, the command also reports the local backend status first.
+- Translation errors show a short reason; hover for provider and diagnostic details, or open settings from supported errors. Repeated automatic failures are limited to one chat notice per provider and error kind every 30 seconds, and circuit-breaker pauses are reported.
 - Aim at a sign or hanging sign and press `G` to translate the face you are looking at. Rebind it in Minecraft's Controls settings.
 - Sign translations appear in a lower-screen panel and disappear 0.8 seconds after looking away. All four lines are translated together; the sign itself is never changed.
 - Sign translation is manual only. Matching text, target language, and provider reuse an in-memory cache until you leave the world.
@@ -144,6 +146,8 @@ Shared settings are stored locally on your PC. They are not uploaded anywhere ju
 ## Privacy Notice — External Data Transmission
 
 **This mod sends chat text to external translation services.** The destination depends on the provider you select.
+
+Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected provider. Run it only if you are comfortable sending that test text to that provider.
 
 Manually translating a sign also sends the text on its visible face to the selected provider under the same conditions below. Manually translating a book page sends that page's text to the selected provider. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local as well.
 

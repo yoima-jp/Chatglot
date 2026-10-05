@@ -5,6 +5,7 @@ import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.client.SignTranslationState;
 import io.github.chatglot.client.SignTranslationState.Key;
 import io.github.chatglot.client.SignTranslationState.Target;
+import io.github.chatglot.client.TranslationErrorMessages;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.translation.LanguageUtil;
 import java.util.List;
@@ -151,12 +152,16 @@ final class SignTranslationController {
                     }
                     if (state == requestedState && client.level == requestedLevel
                         && runtime.configManager().get() == requestedSettings) {
-                        requestedState.complete(key, error == null && result != null ? result.translatedText() : null);
+                        requestedState.complete(
+                            key,
+                            error == null && result != null ? result.translatedText() : null,
+                            error
+                        );
                     }
                 }));
         } catch (RuntimeException error) {
             ChatglotFabric.LOGGER.warn("Could not start sign translation", error);
-            requestedState.complete(key, null);
+            requestedState.complete(key, null, error);
         }
     }
 
@@ -165,7 +170,11 @@ final class SignTranslationController {
             case HIDDEN -> null;
             case LOADING -> Component.translatable("chatglot.sign.loading");
             case READY -> Component.literal(state.translation());
-            case FAILED -> Component.translatable("chatglot.sign.failed", translateKey.getTranslatedKeyMessage());
+            case FAILED -> Component.translatable(
+                "chatglot.sign.failed",
+                TranslationErrorMessages.shortReason(state.failure(), state.failureProviderId()),
+                translateKey.getTranslatedKeyMessage()
+            );
             case BUSY -> Component.translatable("chatglot.sign.busy");
         };
     }

@@ -2,6 +2,7 @@ package io.github.chatglot.fabric;
 
 import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.client.BookTranslationState;
+import io.github.chatglot.client.TranslationErrorMessages;
 import io.github.chatglot.client.BookTranslationState.Key;
 import io.github.chatglot.client.BookTranslationState.Request;
 import io.github.chatglot.client.BookTranslationState.Status;
@@ -219,23 +220,31 @@ public final class BookTranslationController {
         int top = access.chatglot$backgroundTop();
         String translated = state.translation.displayedTranslation(key);
         if (translated != null) {
-            drawTranslation(client.font, graphics, left + 36, top + 30, translated);
+            drawTranslation(client.font, graphics, left + 36, top + 30, translated, 0xFF000000);
             return;
         }
 
         Component message = switch (state.translation.status(key)) {
-            case FAILED -> Component.translatable("chatglot.book.failed");
+            case FAILED -> Component.translatable(
+                "chatglot.book.failed",
+                TranslationErrorMessages.shortReason(state.translation.failure(key), key.provider())
+            );
             case BUSY -> Component.translatable("chatglot.book.busy");
             default -> null;
         };
         if (message != null) {
-            // Keep errors short and on the book page; provider details belong in logs and
-            // the next diagnostics UI, so the book itself remains uncluttered.
-            graphics.text(client.font, message, left + 36, top + 16, 0xFF8B1A1A, false);
+            drawTranslation(client.font, graphics, left + 36, top + 16, message.getString(), 0xFF8B1A1A);
         }
     }
 
-    private static void drawTranslation(Font font, GuiGraphicsExtractor graphics, int x, int y, String text) {
+    private static void drawTranslation(
+        Font font,
+        GuiGraphicsExtractor graphics,
+        int x,
+        int y,
+        String text,
+        int color
+    ) {
         List<String> lines = font.split(Component.literal(text), PAGE_TEXT_WIDTH).stream()
             .map(BookTranslationController::plainText)
             .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
@@ -260,7 +269,7 @@ public final class BookTranslationController {
         graphics.pose().translate(x * (1.0f - scale), y * (1.0f - scale));
         graphics.pose().scale(scale, scale);
         for (int index = 0; index < lines.size(); index++) {
-            graphics.text(font, lines.get(index), x, y + index * font.lineHeight, 0xFF000000, false);
+            graphics.text(font, lines.get(index), x, y + index * font.lineHeight, color, false);
         }
         graphics.pose().popMatrix();
     }

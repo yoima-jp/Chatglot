@@ -16,6 +16,8 @@ public final class SignTranslationState {
     private long lastLookTime;
     private Status status = Status.HIDDEN;
     private String translation = "";
+    private Throwable failure;
+    private String failureProviderId;
 
     public record Key(String text, String language, String provider) { }
 
@@ -42,6 +44,8 @@ public final class SignTranslationState {
         lastLookTime = now;
         translation = cache.getOrDefault(requested.key(), "");
         if (!translation.isEmpty()) {
+            failure = null;
+            failureProviderId = null;
             status = Status.READY;
             return false;
         }
@@ -54,11 +58,17 @@ public final class SignTranslationState {
             return false;
         }
         pending.add(requested.key());
+        failure = null;
+        failureProviderId = null;
         status = Status.LOADING;
         return true;
     }
 
     public void complete(Key key, String result) {
+        complete(key, result, null);
+    }
+
+    public void complete(Key key, String result, Throwable error) {
         if (!pending.remove(key)) {
             return;
         }
@@ -72,6 +82,8 @@ public final class SignTranslationState {
         // A response may populate the cache, but must never reopen a dismissed panel.
         if (target != null && target.key().equals(key)) {
             translation = success ? result : "";
+            failure = success ? null : error;
+            failureProviderId = success ? null : key.provider();
             status = success ? Status.READY : Status.FAILED;
         }
     }
@@ -80,6 +92,8 @@ public final class SignTranslationState {
         target = null;
         status = Status.HIDDEN;
         translation = "";
+        failure = null;
+        failureProviderId = null;
     }
 
     public Status status() {
@@ -88,5 +102,13 @@ public final class SignTranslationState {
 
     public String translation() {
         return translation;
+    }
+
+    public Throwable failure() {
+        return failure;
+    }
+
+    public String failureProviderId() {
+        return failureProviderId;
     }
 }

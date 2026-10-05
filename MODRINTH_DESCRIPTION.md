@@ -18,7 +18,8 @@ Client-side only. No server installation is required.
 - Translation errors show a short reason. Hover for provider and diagnostic details, open settings from supported errors, and see when repeated failures temporarily pause automatic translation.
 - Aim at a sign or hanging sign and press `G` (rebindable) to translate its visible face in a lower-screen panel. Looking away dismisses it after 0.8 seconds; the sign itself is unchanged.
 - Sign translation is manual and uses the selected provider. External providers receive the visible face's text; repeated translations reuse a cache for the current world session.
-- In a written book or lectern, press `G` or the small `Translate` button to translate the current page only. Press again to switch between translation and original; changing pages never sends a request automatically.
+- In a written book or lectern, press `G` or `Translate` to translate the current page only. The button sits below the vanilla menu row; changing pages never sends a request automatically. The button can be hidden in settings while `G` remains available.
+- In a writable book, use `Translate` to translate the current page. `G` remains available for typing, and the editor is disabled while translated text is shown. Translation never changes the book's page contents; hiding the shared button option disables translation for writable books.
 
 ---
 
@@ -82,7 +83,7 @@ Key settings:
 
 Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected provider.
 
-Manually translating a sign sends its visible text to the selected provider. Manually translating a book page sends only that page's text to the selected provider. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
+Manually translating a sign sends its visible text to the selected provider. Manually translating a page in a written, lectern, or writable book sends only that page's text to the selected provider. Translating a writable book never changes its page contents. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
 
 - **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).

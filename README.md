@@ -44,7 +44,8 @@ The project focuses on practical choice and transparency:
 - Aim at a sign or hanging sign and press `G` to translate the face you are looking at. Rebind it in Minecraft's Controls settings.
 - Sign translations appear in a lower-screen panel and disappear 0.8 seconds after looking away. All four lines are translated together; the sign itself is never changed.
 - Sign translation is manual only. Matching text, target language, and provider reuse an in-memory cache until you leave the world.
-- In a written book or lectern, press `G` or the small `Translate` button to translate the current page only. Press again to switch between the translation and original; page changes never start a request on their own.
+- In a written book or lectern, press `G` or `Translate` to translate the current page only. The button sits below the vanilla menu row; page changes never start a request on their own. The button can be hidden in settings while `G` remains available.
+- In a writable book, use `Translate` to translate the current page. `G` remains available for typing, and the editor is disabled while translated text is shown. Translation never changes the book's page contents; hiding the shared button option disables translation for writable books.
 ![Config GUI](https://cdn.modrinth.com/data/cached_images/166cb33a9ad36001e34402412d0574044f5cdefd.jpeg)
 ---
 
@@ -149,7 +150,7 @@ Shared settings are stored locally on your PC. They are not uploaded anywhere ju
 
 Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected provider. Run it only if you are comfortable sending that test text to that provider.
 
-Manually translating a sign also sends the text on its visible face to the selected provider under the same conditions below. Manually translating a book page sends that page's text to the selected provider. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local as well.
+Manually translating a sign also sends the text on its visible face to the selected provider under the same conditions below. Manually translating a page in a written, lectern, or writable book sends only that page's text to the selected provider. Translating a writable book never changes its page contents. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local as well.
 
 - **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).

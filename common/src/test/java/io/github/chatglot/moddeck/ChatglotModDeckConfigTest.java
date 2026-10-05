@@ -92,6 +92,7 @@ class ChatglotModDeckConfigTest {
         assertTrue(definition.option("general", "append_button").isPresent());
         assertTrue(definition.option("general", "button_label").isPresent());
         assertTrue(definition.option("general", "auto_translate").isPresent());
+        assertTrue(definition.option("general", "show_book_translate_button").isPresent());
         assertTrue(definition.option("general", "request_timeout").isPresent());
         assertTrue(definition.option("general", "max_concurrent_translations").isPresent());
     }

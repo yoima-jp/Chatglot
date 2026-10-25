@@ -1,6 +1,5 @@
 package io.github.chatglot.moddeck;
 
-import com.google.gson.stream.JsonReader;
 import com.yoima.moddeck.api.ConfigDefinition;
 import com.yoima.moddeck.api.ConfigRegistry;
 import com.yoima.moddeck.api.ConfigScreenApi;
@@ -9,6 +8,7 @@ import com.yoima.moddeck.api.option.*;
 import io.github.chatglot.ChatglotConstants;
 import io.github.chatglot.ChatglotRuntime;
 import io.github.chatglot.client.ChatOutput;
+import io.github.chatglot.client.MinecraftLanguageCatalog;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.config.ChatglotStoragePaths;
 import io.github.chatglot.localbackend.LocalBackendPaths;
@@ -21,10 +21,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.resources.language.LanguageInfo;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -386,6 +383,18 @@ function jsonResponse(data) {
             new LanguageOptionCodec(),
             MinecraftLanguageOption::labelText
         );
+        SelectorOption<MinecraftLanguageOption> outgoingTargetLanguage = selectorOption(
+            "outgoing_target_language",
+            "chatglot.config.outgoing_target_language",
+            resolveOutgoingTargetLanguageOption(
+                languageOptions,
+                resolveCurrentLanguageOption(Minecraft.getInstance(), languageOptions),
+                config.outgoingTargetLanguage
+            ),
+            languageOptions,
+            new LanguageOptionCodec(),
+            MinecraftLanguageOption::labelText
+        );
         BooleanOption appendButton = booleanOption("append_button", "chatglot.config.append_button", config.appendTranslateButton);
         StringOption buttonLabel = stringOption(
             "button_label",
@@ -558,6 +567,7 @@ function jsonResponse(data) {
             .addOption(provider)
             .descriptionEntry("provider_notice", ConfigText.translatable("chatglot.config.provider_notice"))
             .addOption(targetLanguage)
+            .addOption(outgoingTargetLanguage)
             .addOption(appendButton)
             .addOption(buttonLabel)
             .addOption(autoTranslate)
@@ -727,6 +737,7 @@ function jsonResponse(data) {
 
         config.sanitize();
         runtime.configManager().save();
+        config = runtime.configManager().get();
         runtime.localBackendManager().applyConfiguredBackendPolicyAsync(config);
     }
 
@@ -736,6 +747,7 @@ function jsonResponse(data) {
             case "enabled" -> config.enabled = (Boolean) draft;
             case "provider" -> config.provider = ((ProviderOption) draft).id();
             case "target_language" -> config.targetLanguage = toStoredTargetLanguage(((MinecraftLanguageOption) draft).code());
+            case "outgoing_target_language" -> config.outgoingTargetLanguage = toStoredTargetLanguage(((MinecraftLanguageOption) draft).code());
             case "append_button" -> config.appendTranslateButton = (Boolean) draft;
             case "button_label" -> config.translateButtonLabel = (String) draft;
             case "auto_translate" -> config.autoTranslateEnabled = (Boolean) draft;
@@ -1072,71 +1084,9 @@ function jsonResponse(data) {
     }
 
     private static List<MinecraftLanguageOption> collectLanguageOptions(Minecraft client) {
-        if (client == null || client.getLanguageManager() == null) {
-            return List.of(new MinecraftLanguageOption("en_us", ConfigText.literal("English (US)")));
-        }
-        List<MinecraftLanguageOption> result = new ArrayList<>();
-        for (Map.Entry<String, LanguageInfo> entry : client.getLanguageManager().getLanguages().entrySet()) {
-            String code = entry.getKey();
-            String label = entry.getValue().toComponent().getString();
-            result.add(new MinecraftLanguageOption(code, ConfigText.literal(label)));
-        }
-        // Minecraft 26.3 client can expose only en_us through LanguageManager even though the
-        // downloaded asset pack contains every language. Read the same native name/region
-        // fields from those language resources instead of shipping a stale hard-coded list.
-        if (result.size() <= 1) {
-            collectLanguageResourceOptions(client).forEach(option -> {
-                if (findOptionByCode(result, option.code()).isEmpty()) {
-                    result.add(option);
-                }
-            });
-        }
-        result.sort((left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.label().value(), right.label().value()));
-        if (result.isEmpty()) {
-            result.add(new MinecraftLanguageOption("en_us", ConfigText.literal("English (US)")));
-        }
-        return result;
-    }
-
-    private static List<MinecraftLanguageOption> collectLanguageResourceOptions(Minecraft client) {
-        List<MinecraftLanguageOption> result = new ArrayList<>();
-        Map<Identifier, Resource> resources = client.getResourceManager().listResources(
-            "lang",
-            id -> id.getNamespace().equals("minecraft") && id.getPath().endsWith(".json")
-        );
-        for (Map.Entry<Identifier, Resource> entry : resources.entrySet()) {
-            String path = entry.getKey().getPath();
-            String code = path.substring("lang/".length(), path.length() - ".json".length());
-            readLanguageLabel(entry.getValue()).ifPresent(label ->
-                result.add(new MinecraftLanguageOption(code, ConfigText.literal(label))));
-        }
-        LOGGER.info("Discovered {} Minecraft language resources as a fallback.", result.size());
-        return result;
-    }
-
-    private static Optional<String> readLanguageLabel(Resource resource) {
-        String name = null;
-        String region = null;
-        try (JsonReader reader = new JsonReader(resource.openAsReader())) {
-            reader.beginObject();
-            while (reader.hasNext() && (name == null || region == null)) {
-                String key = reader.nextName();
-                if ("language.name".equals(key)) {
-                    name = reader.nextString();
-                } else if ("language.region".equals(key)) {
-                    region = reader.nextString();
-                } else {
-                    reader.skipValue();
-                }
-            }
-        } catch (IOException | IllegalStateException exception) {
-            LOGGER.warn("Could not read Minecraft language metadata from {}.", resource.sourcePackId(), exception);
-            return Optional.empty();
-        }
-        if (name == null || name.isBlank()) {
-            return Optional.empty();
-        }
-        return Optional.of(region == null || region.isBlank() ? name : name + " (" + region + ")");
+        return MinecraftLanguageCatalog.collect(client).stream()
+            .map(option -> new MinecraftLanguageOption(option.code(), ConfigText.literal(option.label())))
+            .toList();
     }
 
     private static MinecraftLanguageOption resolveCurrentLanguageOption(Minecraft client, List<MinecraftLanguageOption> options) {
@@ -1176,6 +1126,30 @@ function jsonResponse(data) {
             }
         }
         return currentLanguageOption;
+    }
+
+    private static MinecraftLanguageOption resolveOutgoingTargetLanguageOption(
+        List<MinecraftLanguageOption> options,
+        MinecraftLanguageOption currentLanguageOption,
+        String configuredTargetLanguage
+    ) {
+        Optional<MinecraftLanguageOption> exact = findOptionByCode(options, configuredTargetLanguage);
+        if (exact.isPresent()) {
+            return exact.orElseThrow();
+        }
+        // The outgoing default is language-neutral "en", while Minecraft's catalog usually
+        // stores English as en_us. Resolve that default before falling back to the UI language.
+        if ("en".equals(normalizeLanguageCode(configuredTargetLanguage))) {
+            Optional<MinecraftLanguageOption> english = findOptionByCode(options, "en_us");
+            if (english.isEmpty()) {
+                english = findOptionByCode(options, "en");
+            }
+            if (english.isPresent()) {
+                return english.orElseThrow();
+            }
+        }
+        return resolveSelectedLanguageOption(
+            options, currentLanguageOption, currentLanguageOption, configuredTargetLanguage);
     }
 
     private static MinecraftLanguageOption createDefaultLanguageOption(MinecraftLanguageOption currentLanguageOption) {

@@ -46,6 +46,7 @@ The project focuses on practical choice and transparency:
 - Sign translation is manual only. Matching text, target language, and provider reuse an in-memory cache until you leave the world.
 - In a written book or lectern, press `G` or `Translate` to translate the current page only. The button sits below the vanilla menu row; page changes never start a request on their own. The button can be hidden in settings while `G` remains available.
 - In a writable book, use `Translate` to translate the current page. `G` remains available for typing, and the editor is disabled while translated text is shown. Translation never changes the book's page contents; hiding the shared button option disables translation for writable books.
+- In the chat input, choose an outgoing language and translate your draft to preview it. Apply the preview with `Tab` or a click; the incoming-chat target language remains separate.
 ![Config GUI](https://cdn.modrinth.com/data/cached_images/166cb33a9ad36001e34402412d0574044f5cdefd.jpeg)
 ---
 
@@ -97,6 +98,7 @@ Key settings:
 - `enabled` — Enable or disable the mod entirely
 - `autoTranslateEnabled` — Toggle automatic translation
 - `targetLanguage` — e.g. `JA`, `EN`, `EN-US`, `ZH-HANS` (defaults to your Minecraft language)
+- `outgoingTargetLanguage` — default language for translating your own chat draft (defaults to English)
 - `provider` — Choose your translation backend
 - `overwriteOriginalWithTranslation` — Replace original message instead of adding a new line
 - `appendTranslateButton` — Show or hide the `✍` button
@@ -151,6 +153,8 @@ Shared settings are stored locally on your PC. They are not uploaded anywhere ju
 Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected provider. Run it only if you are comfortable sending that test text to that provider.
 
 Manually translating a sign also sends the text on its visible face to the selected provider under the same conditions below. Manually translating a page in a written, lectern, or writable book sends only that page's text to the selected provider. Translating a writable book never changes its page contents. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local as well.
+
+Translating a chat draft sends the text in the input field to the selected provider only when you press the translate button. Typing, opening the language picker, and previewing the field do not send the draft. The outgoing language setting is separate from the target used for incoming chat translation. With local TranslateGemma, the draft is sent only to the local backend.
 
 - **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).

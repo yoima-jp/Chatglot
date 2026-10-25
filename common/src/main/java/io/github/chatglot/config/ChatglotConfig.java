@@ -1,6 +1,9 @@
 package io.github.chatglot.config;
 
 import java.util.Locale;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 
 public class ChatglotConfig {
     public static final String DEFAULT_TRANSLATE_BUTTON_LABEL = "✍";
@@ -39,6 +42,8 @@ public class ChatglotConfig {
     public boolean preserveLeadingSpeakerPrefix = true;
     public boolean showBookTranslateButton = true;
     public String targetLanguage = "EN";
+    public String outgoingTargetLanguage = "en";
+    public List<String> recentOutgoingLanguages = new ArrayList<>();
     public boolean showSourceLanguageTag = true;
 
     public String provider = DEFAULT_PROVIDER;
@@ -96,6 +101,10 @@ public class ChatglotConfig {
         copy.preserveLeadingSpeakerPrefix = preserveLeadingSpeakerPrefix;
         copy.showBookTranslateButton = showBookTranslateButton;
         copy.targetLanguage = targetLanguage;
+        copy.outgoingTargetLanguage = outgoingTargetLanguage;
+        copy.recentOutgoingLanguages = recentOutgoingLanguages == null
+            ? new ArrayList<>()
+            : new ArrayList<>(recentOutgoingLanguages);
         copy.showSourceLanguageTag = showSourceLanguageTag;
         copy.provider = provider;
         copy.useSharedAppDataSettings = useSharedAppDataSettings;
@@ -148,6 +157,10 @@ public class ChatglotConfig {
         preserveLeadingSpeakerPrefix = other.preserveLeadingSpeakerPrefix;
         showBookTranslateButton = other.showBookTranslateButton;
         targetLanguage = other.targetLanguage;
+        outgoingTargetLanguage = other.outgoingTargetLanguage;
+        recentOutgoingLanguages = other.recentOutgoingLanguages == null
+            ? new ArrayList<>()
+            : new ArrayList<>(other.recentOutgoingLanguages);
         showSourceLanguageTag = other.showSourceLanguageTag;
         provider = other.provider;
         deeplApiKey = other.deeplApiKey;
@@ -225,6 +238,22 @@ public class ChatglotConfig {
             targetLanguage = "EN";
         }
         targetLanguage = targetLanguage.trim().toUpperCase(Locale.ROOT);
+        if (outgoingTargetLanguage == null || outgoingTargetLanguage.isBlank()) {
+            outgoingTargetLanguage = "en";
+        }
+        outgoingTargetLanguage = normalizeOutgoingLanguage(outgoingTargetLanguage);
+        LinkedHashSet<String> recentLanguages = new LinkedHashSet<>();
+        if (recentOutgoingLanguages != null) {
+            for (String language : recentOutgoingLanguages) {
+                if (language != null && !language.isBlank()) {
+                    recentLanguages.add(normalizeOutgoingLanguage(language));
+                    if (recentLanguages.size() == 5) {
+                        break;
+                    }
+                }
+            }
+        }
+        recentOutgoingLanguages = new ArrayList<>(recentLanguages);
 
         if (provider == null || provider.isBlank()) {
             provider = DEFAULT_PROVIDER;
@@ -387,6 +416,10 @@ public class ChatglotConfig {
         codexReasoningSummary = codexReasoningSummary.trim();
 
         autoTranslateEnabled = autoTranslateEnabledWhenSupported && !DEFAULT_PROVIDER.equals(provider);
+    }
+
+    private static String normalizeOutgoingLanguage(String language) {
+        return language.trim().replace('-', '_').toLowerCase(Locale.ROOT);
     }
 }
 

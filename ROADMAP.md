@@ -21,7 +21,7 @@ Chatglot's main goal is to keep practical Minecraft chat translation available f
 
 ## Current Translation Targets
 
-Chatglot supports chat messages, signs and hanging signs, and written books. In a book or lectern, press `G` or the small `Translate` button to translate only the current page; page changes do not send requests automatically. The page text is sent to the selected provider when translation is requested. The local TranslateGemma option keeps it on the device.
+Chatglot supports chat messages, chat input drafts, signs and hanging signs, and written books. In the chat input, translate a draft to a preview and apply it with `Tab` or a click; the draft is sent only when the translate button is pressed. In a book or lectern, press `G` or the small `Translate` button to translate only the current page; page changes do not send requests automatically. The page text is sent to the selected provider when translation is requested. The local TranslateGemma option keeps both draft and book text on the device.
 
 ## Future Translation Targets
 

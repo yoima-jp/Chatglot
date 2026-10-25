@@ -5,7 +5,9 @@
   "client": [
     "BookEditScreenAccessor",
     "BookViewScreenAccessor",
-    "BookViewScreenMixin"
+    "BookViewScreenMixin",
+    "ChatScreenAccessor",
+    "ChatScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1

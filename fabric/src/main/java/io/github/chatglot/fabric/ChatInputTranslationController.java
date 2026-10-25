@@ -161,7 +161,7 @@ public final class ChatInputTranslationController {
         state.languageButton.setMessage(Component.translatable(
             "chatglot.input.language_button", languageCode(config.outgoingTargetLanguage)));
         boolean command = isCommand(screen, state.input.getValue());
-        boolean blank = state.input.getValue() == null || state.input.getValue().isBlank();
+        boolean blank = isBlankMessage(screen, state.input.getValue());
         boolean ready = isScreenReady(client, screen, state) && !blank && !command
             && state.translation.status() != Status.LOADING;
         state.translateButton.active = ready;
@@ -205,7 +205,8 @@ public final class ChatInputTranslationController {
         }
         ChatglotConfig config = ChatglotRuntime.get().configManager().get();
         String text = state.input.getValue();
-        if (!config.enabled || !ChatInputTranslationState.canTranslate(text) || isCommand(chatScreen, text)) {
+        if (!config.enabled || !ChatInputTranslationState.canTranslate(text) || isBlankMessage(chatScreen, text)
+            || isCommand(chatScreen, text)) {
             updateButtons(client, chatScreen, state, config);
             return;
         }
@@ -537,6 +538,16 @@ public final class ChatInputTranslationController {
         return normalized;
     }
 
+    // String.isBlank() は NBSP (U+00A0) などを空白と見なさないが、ChatScreen.normalizeChatMessage は
+    // それらも取り除く。送信時に空になる入力を provider へ送らないよう、送信と同じ正規化で判定する。
+    private static boolean isBlankMessage(ChatScreen screen, String value) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        String normalized = ((ChatScreenAccessor) screen).chatglot$normalizeChatMessage(value);
+        return normalized == null || normalized.isEmpty();
+    }
+
     private static boolean isCommand(ChatScreen screen, String value) {
         if (value == null) {
             return false;
@@ -785,7 +796,8 @@ public final class ChatInputTranslationController {
 
         @Override
         public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-            if (event.button() == 0) {
+            // 26.3 では InputConstants.MOUSE_BUTTON_LEFT が 1 になっているため、GLFW の 0 を直書きしない。
+            if (event.button() == InputConstants.MOUSE_BUTTON_LEFT) {
                 list.setSelected(this);
                 selectLanguage(Minecraft.getInstance().gui.screen(), state, option);
                 return true;

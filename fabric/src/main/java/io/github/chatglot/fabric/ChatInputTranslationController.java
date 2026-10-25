@@ -99,8 +99,8 @@ public final class ChatInputTranslationController {
             .bounds(controlsX + screenState.languageButtonWidth + BUTTON_GAP, screenState.input.getY(),
                 TRANSLATE_BUTTON_WIDTH, screenState.input.getHeight())
             .build();
-        Screens.getWidgets(screen).add(screenState.languageButton);
-        Screens.getWidgets(screen).add(screenState.translateButton);
+        addMouseOnlyWidget(screen, screenState.languageButton);
+        addMouseOnlyWidget(screen, screenState.translateButton);
 
         registerScreenEvents(screen, screenState);
         refresh(client, screen, screenState);
@@ -110,9 +110,21 @@ public final class ChatInputTranslationController {
         ScreenEvents.afterTick(screen).register(ignored -> tick(screen, state));
         ScreenKeyboardEvents.allowKeyPress(screen).register((ignored, event) -> allowKeyPress(screen, state, event));
         ScreenMouseEvents.allowMouseClick(screen).register((ignored, event) -> allowMouseClick(screen, state, event));
+        ScreenMouseEvents.allowMouseRelease(screen).register((ignored, event) ->
+            allowMouseRelease(state, event));
+        ScreenMouseEvents.allowMouseDrag(screen).register((ignored, event, deltaX, deltaY) ->
+            allowMouseDrag(state, event, deltaX, deltaY));
         ScreenMouseEvents.allowMouseScroll(screen).register((ignored, mouseX, mouseY, horizontal, vertical) ->
             allowMouseScroll(screen, state, mouseX, mouseY, horizontal, vertical));
         ScreenEvents.remove(screen).register(ignored -> remove(screen, state));
+    }
+
+    private static void addMouseOnlyWidget(Screen screen, AbstractWidget widget) {
+        Screens.getWidgets(screen).add(widget);
+        // ChatScreen calls Screen.keyPressed before applying ↑/↓ history, so Screen's focus
+        // traversal can otherwise consume those keys. Keep these controls rendered but out of
+        // the focusable children; allowMouseClick dispatches their clicks directly.
+        screen.children().remove(widget);
     }
 
     private void tick(Screen screen, ScreenState state) {
@@ -284,8 +296,8 @@ public final class ChatInputTranslationController {
                 })
                 .tooltip(Tooltip.create(Component.translatable("chatglot.input.discard")))
                 .build();
-            Screens.getWidgets(screen).add(state.preview);
-            Screens.getWidgets(screen).add(state.closePreviewButton);
+            addMouseOnlyWidget(screen, state.preview);
+            addMouseOnlyWidget(screen, state.closePreviewButton);
         }
         int previewWidth = Math.max(20, state.inputWidth - 26);
         int previewX = state.input.getX();
@@ -376,6 +388,7 @@ public final class ChatInputTranslationController {
         double x = event.x();
         double y = event.y();
         if (state.popup != null) {
+            state.popupMouseGesture = true;
             if (state.popup.contains(x, y)) {
                 for (Button recent : state.popup.recentButtons) {
                     if (recent.isMouseOver(x, y)) {
@@ -386,27 +399,53 @@ public final class ChatInputTranslationController {
                 state.popup.list.mouseClicked(event, false);
                 return false;
             }
+            // The same press would otherwise continue through ChatScreen and activate controls
+            // or chat links behind the picker after it closes.
             state.closePopup(screen);
             state.restoreInputFocus(screen);
-            return true;
+            return false;
         }
+        state.popupMouseGesture = false;
         if (state.languageButton != null && state.languageButton.isMouseOver(x, y)) {
             state.languageButton.mouseClicked(event, false);
+            state.restoreInputFocus(screen);
             return false;
         }
         if (state.translateButton != null && state.translateButton.isMouseOver(x, y)) {
             state.translateButton.mouseClicked(event, false);
+            state.restoreInputFocus(screen);
             return false;
         }
         if (state.preview != null && state.preview.isMouseOver(x, y)) {
             state.preview.mouseClicked(event, false);
+            state.restoreInputFocus(screen);
             return false;
         }
         if (state.closePreviewButton != null && state.closePreviewButton.isMouseOver(x, y)) {
             state.closePreviewButton.mouseClicked(event, false);
+            state.restoreInputFocus(screen);
             return false;
         }
         return true;
+    }
+
+    private boolean allowMouseRelease(ScreenState state, MouseButtonEvent event) {
+        if (state.popup == null && !state.popupMouseGesture) {
+            return true;
+        }
+        if (state.popup != null) {
+            state.popup.list.mouseReleased(event);
+        }
+        state.popupMouseGesture = false;
+        return false;
+    }
+
+    private boolean allowMouseDrag(ScreenState state, MouseButtonEvent event, double deltaX, double deltaY) {
+        if (state.popup == null) {
+            return !state.popupMouseGesture;
+        }
+        state.popup.list.mouseDragged(event, deltaX, deltaY);
+        return false;
     }
 
     private boolean allowMouseScroll(Screen screen, ScreenState state, double mouseX, double mouseY,
@@ -452,11 +491,11 @@ public final class ChatInputTranslationController {
                 .tooltip(Tooltip.create(Component.literal(option.label())))
                 .build();
             popup.recentButtons.add(recentButton);
-            Screens.getWidgets(screen).add(recentButton);
+            addMouseOnlyWidget(screen, recentButton);
         }
         popup.title = new PopupTitleWidget(x + 6, top + 6, 50, 16,
             Component.translatable("chatglot.input.recent"));
-        Screens.getWidgets(screen).add(popup.title);
+        addMouseOnlyWidget(screen, popup.title);
         Screens.getWidgets(screen).add(popup.list);
         state.input.setFocused(false);
         popup.list.setFocused(popup.list.getSelected());
@@ -533,8 +572,11 @@ public final class ChatInputTranslationController {
         private PreviewWidget preview;
         private Button closePreviewButton;
         private LanguagePopup popup;
+        private boolean popupMouseGesture;
 
         private void removePreview(Screen screen) {
+            boolean hadFocus = (preview != null && screen.getFocused() == preview)
+                || (closePreviewButton != null && screen.getFocused() == closePreviewButton);
             if (preview != null) {
                 Screens.getWidgets(screen).remove(preview);
                 preview = null;
@@ -543,18 +585,26 @@ public final class ChatInputTranslationController {
                 Screens.getWidgets(screen).remove(closePreviewButton);
                 closePreviewButton = null;
             }
+            if (hadFocus) {
+                restoreInputFocus(screen);
+            }
         }
 
         private void closePopup(Screen screen) {
             if (popup == null) {
                 return;
             }
+            boolean hadFocus = screen.getFocused() == popup.list || screen.getFocused() == popup.title
+                || popup.recentButtons.contains(screen.getFocused());
             for (Button button : popup.recentButtons) {
                 Screens.getWidgets(screen).remove(button);
             }
             Screens.getWidgets(screen).remove(popup.title);
             Screens.getWidgets(screen).remove(popup.list);
             popup = null;
+            if (hadFocus) {
+                restoreInputFocus(screen);
+            }
         }
 
         private void restoreInputFocus(Screen screen) {

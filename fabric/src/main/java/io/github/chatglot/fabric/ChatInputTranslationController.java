@@ -409,7 +409,11 @@ public final class ChatInputTranslationController {
         state.popupMouseGesture = false;
         if (state.languageButton != null && state.languageButton.isMouseOver(x, y)) {
             state.languageButton.mouseClicked(event, false);
-            state.restoreInputFocus(screen);
+            // ポップアップを開いた場合はリストにフォーカスを残す。入力欄へ戻すと、表示中の文字キーが
+            // 原文を書き換えてプレビューまで破棄してしまう。閉じたときは selectLanguage / closePopup 側で戻す。
+            if (state.popup == null) {
+                state.restoreInputFocus(screen);
+            }
             return false;
         }
         if (state.translateButton != null && state.translateButton.isMouseOver(x, y)) {

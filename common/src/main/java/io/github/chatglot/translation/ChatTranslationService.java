@@ -390,6 +390,8 @@ public final class ChatTranslationService {
                 settings.addProperty("modelAlias", config.localModelAlias);
                 settings.addProperty("modelPath", config.localModelPath);
                 settings.addProperty("modelFileName", config.localModelFileName);
+                // With an empty modelPath, the model is resolved from the shared directory.
+                settings.addProperty("sharedDirectory", config.localBackendSharedDirectory);
             }
             default -> { }
         }

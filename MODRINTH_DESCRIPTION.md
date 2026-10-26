@@ -11,8 +11,8 @@ Client-side only. No server installation is required.
 
 - Translate button appended to every chat message (configurable label)
 - Click-to-translate or automatic translation
-- Free Google Translate web translation by default; no API key or setup required
-- Persistent local cache to reuse successful translations
+- Works out of the box: the default provider uses Google Translate's free web API, with no API key, account, or setup
+- Persistent local translation cache, so repeated messages are shown instantly without another request
 - Result shown as a new line **or** replaces the original chat message
 - Open the settings screen with `F8` or `/chatglot config`
 - Translate a specific message with `/chatglot translate <id>`
@@ -22,6 +22,7 @@ Client-side only. No server installation is required.
 - Sign translation is manual and uses the selected provider. External providers receive the visible face's text; repeated translations reuse a cache for the current world session.
 - In a written book or lectern, press `G` or `Translate` to translate the current page only. The button sits below the vanilla menu row; changing pages never sends a request automatically. The button can be hidden in settings while `G` remains available.
 - In a writable book, use `Translate` to translate the current page. `G` remains available for typing, and the editor is disabled while translated text is shown. Translation never changes the book's page contents; hiding the shared button option disables translation for writable books.
+- In the chat input, choose an outgoing language and translate your draft to preview it before sending. Apply the preview with `Tab` or a click; the incoming-chat target language remains separate.
 
 ---
 
@@ -45,6 +46,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 
 ## Recommended Providers
 
+- **`default`**: Best for getting started. Free, needs no setup, and supports auto-translate. Because it relies on an unofficial API, Google may rate-limit it during heavy use; switch to another provider if that happens.
 - **`gas`**: Good if you want a free setup with your own Google account. Google Apps Script documents up to `5,000` Translate calls per day for consumer accounts, though quotas can change. See [Apps Script quotas](https://developers.google.com/apps-script/guides/services/quotas).
 - **`codex`**: Recommended if you already subscribe to ChatGPT. OpenAI states that Codex is included with ChatGPT Plus, Pro, Business, Edu, and Enterprise plans, with plan-based limits. See [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan).
 - **`azure`**: A good option if you want an official API with a free tier. Azure Translator `F0` includes `2 million` characters free per month according to Microsoft's pricing page. See [Azure Translator pricing](https://azure.microsoft.com/pricing/details/cognitive-services/translator/).
@@ -68,6 +70,7 @@ Key settings:
 
 - `enabled` — Enable or disable the mod entirely
 - `autoTranslateEnabled` — Toggle automatic translation
+- `outgoingTargetLanguage` — Default language for translating your own chat draft (default: English)
 - `targetLanguage` — e.g. `JA`, `EN`, `EN-US`, `ZH-HANS` (defaults to your Minecraft language)
 - `provider` — Choose your translation backend
 - `overwriteOriginalWithTranslation` — Replace original message instead of adding a new line
@@ -90,6 +93,8 @@ Successful results stay cached until LRU eviction or deletion. The cache is stor
 Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected provider.
 
 Manually translating a sign sends its visible text to the selected provider. Manually translating a page in a written, lectern, or writable book sends only that page's text to the selected provider. Translating a writable book never changes its page contents. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
+
+Translating a chat draft sends the text in the input field to the selected provider only when you press the translate button. Typing or opening the language picker does not send the draft.
 
 - **`default` provider**: Chat text is sent to Google's unofficial web translation API. It is free and needs no user setup, but access may be limited or changed without notice; switch providers if it becomes unavailable.
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).

@@ -10,12 +10,17 @@ public final class ChatglotStoragePaths {
     private static final String LOCAL_BACKEND_DIR_NAME = "local-backend";
     private static final String SHARED_SETTINGS_FILE_NAME = "shared-settings.json";
     private static final String CODEX_TOKEN_FILENAME = "codex_tokens.json";
+    private static final String TRANSLATION_CACHE_FILENAME = "translation-cache.json";
 
     private ChatglotStoragePaths() {
     }
 
     public static Path resolveModConfigRoot(Path configDir) {
         return configDir.resolve(ChatglotConstants.MOD_ID);
+    }
+
+    public static Path resolveTranslationCacheFile(Path configDir) {
+        return resolveModConfigRoot(configDir).resolve(TRANSLATION_CACHE_FILENAME);
     }
 
     public static Path resolveSharedSettingsFile() {

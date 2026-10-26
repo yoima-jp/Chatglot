@@ -18,7 +18,7 @@ import net.minecraft.network.chat.Style;
 public final class TranslationErrorMessages {
     private static final int MAX_DETAIL_LENGTH = 200;
     private static final Set<String> PROVIDER_IDS = Set.of(
-        "default", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini",
+        "default", "google_web", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini",
         "anthropic", "azure", "translategemma_local"
     );
     private static final Set<TranslationException.Kind> SETTINGS_KINDS = Set.of(
@@ -139,7 +139,7 @@ public final class TranslationErrorMessages {
         return switch (kind) {
             case AUTH -> "chatglot.error.auth.hint";
             case CONFIG_MISSING -> "chatglot.error.config_missing.hint";
-            case RATE_LIMITED -> isDefaultGas(providerId, configuredProviderId)
+            case RATE_LIMITED -> isDefaultGoogleWeb(providerId, configuredProviderId)
                 ? "chatglot.error.rate_limited.hint.default"
                 : "chatglot.error.rate_limited.hint";
             case QUOTA -> "chatglot.error.quota.hint";
@@ -155,9 +155,9 @@ public final class TranslationErrorMessages {
         };
     }
 
-    private static boolean isDefaultGas(String providerId, String configuredProviderId) {
+    private static boolean isDefaultGoogleWeb(String providerId, String configuredProviderId) {
         return ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(configuredProviderId)
-            || ("gas".equalsIgnoreCase(providerId)
+            || ("google_web".equalsIgnoreCase(providerId)
                 && (configuredProviderId == null || configuredProviderId.isBlank()));
     }
 

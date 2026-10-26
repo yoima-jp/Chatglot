@@ -5,6 +5,7 @@ Chatglot's main goal is to keep practical Minecraft chat translation available f
 ## Recently Completed
 
 - Provider retries, automatic translation circuit-breaker pauses, classified error guidance with hover details, and `/chatglot diagnose` for checking the selected provider.
+- Google's free unofficial web translation API as the no-setup default, plus a persistent local LRU translation cache.
 
 ## Current Priority
 
@@ -35,7 +36,7 @@ Other targets may need careful UX design because they can involve longer text, f
 
 - Add focused regression coverage for translation request handling and provider fallback behavior.
 - Improve mixed-language UX for multiplayer servers.
-- Explore safer defaults for external translation providers.
+- Keep provider defaults and cache privacy behavior clearly documented.
 - Document provider setup examples for common player use cases.
 
 ## Maintenance Policy

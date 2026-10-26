@@ -1,9 +1,11 @@
 package io.github.chatglot.translation;
 
+import com.google.gson.JsonObject;
 import io.github.chatglot.config.ChatglotConfig;
 import io.github.chatglot.config.ChatglotConfigManager;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.net.URI;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +25,7 @@ public final class ChatTranslationService {
     private final TranslationProviderRegistry providerRegistry;
     private final Path configDir;
     private final Path gameDir;
+    private final TranslationCache translationCache;
     private final TranslationCircuitBreaker circuitBreaker;
     private final ConcurrentHashMap<TranslationKey, CompletableFuture<TranslationResult>> inFlight = new ConcurrentHashMap<>();
     private final Object executorLock = new Object();
@@ -45,11 +48,33 @@ public final class ChatTranslationService {
         Path gameDir,
         TranslationCircuitBreaker circuitBreaker
     ) {
+        this(
+            configManager,
+            providerRegistry,
+            configDir,
+            gameDir,
+            circuitBreaker,
+            new TranslationCache(
+                io.github.chatglot.config.ChatglotStoragePaths.resolveTranslationCacheFile(configDir),
+                configManager.get().translationCacheMaxEntries
+            )
+        );
+    }
+
+    public ChatTranslationService(
+        ChatglotConfigManager configManager,
+        TranslationProviderRegistry providerRegistry,
+        Path configDir,
+        Path gameDir,
+        TranslationCircuitBreaker circuitBreaker,
+        TranslationCache translationCache
+    ) {
         this.configManager = configManager;
         this.providerRegistry = providerRegistry;
         this.configDir = configDir;
         this.gameDir = gameDir;
         this.circuitBreaker = circuitBreaker;
+        this.translationCache = translationCache;
         this.executorParallelism = 0;
     }
 
@@ -58,6 +83,25 @@ public final class ChatTranslationService {
         String targetLanguage,
         String sourceLanguageHint,
         boolean automatic
+    ) {
+        return translate(text, targetLanguage, sourceLanguageHint, automatic, true);
+    }
+
+    public CompletableFuture<TranslationResult> translateWithoutCache(
+        String text,
+        String targetLanguage,
+        String sourceLanguageHint,
+        boolean automatic
+    ) {
+        return translate(text, targetLanguage, sourceLanguageHint, automatic, false);
+    }
+
+    private CompletableFuture<TranslationResult> translate(
+        String text,
+        String targetLanguage,
+        String sourceLanguageHint,
+        boolean automatic,
+        boolean useCache
     ) {
         ChatglotConfig config = configManager.get();
         config.sanitize();
@@ -90,7 +134,20 @@ public final class ChatTranslationService {
 
         TranslationProvider provider = providerOptional.orElseThrow();
         String resolvedSourceHint = LanguageUtil.normalize(sourceLanguageHint);
-        TranslationKey key = new TranslationKey(text, resolvedTargetLanguage, resolvedSourceHint, providerId, config);
+        TranslationCache.Key cacheKey = new TranslationCache.Key(
+            providerId,
+            resolvedSourceHint,
+            resolvedTargetLanguage,
+            text,
+            outputSettingsFingerprint(providerId, config)
+        );
+        TranslationKey key = new TranslationKey(cacheKey, config);
+        if (useCache && config.translationCacheEnabled) {
+            Optional<TranslationCache.Entry> cached = translationCache.get(cacheKey, config.translationCacheMaxEntries);
+            if (cached.isPresent()) {
+                return CompletableFuture.completedFuture(toResult(cacheKey, cached.orElseThrow()));
+            }
+        }
         CompletableFuture<TranslationResult> shared = inFlight.get(key);
         if (shared != null) {
             return detached(shared);
@@ -100,6 +157,16 @@ public final class ChatTranslationService {
         shared = inFlight.putIfAbsent(key, created);
         if (shared != null) {
             return detached(shared);
+        }
+
+        // A request may have filled the persistent cache between the first lookup and this map insertion.
+        if (useCache && config.translationCacheEnabled) {
+            Optional<TranslationCache.Entry> cached = translationCache.get(cacheKey, config.translationCacheMaxEntries);
+            if (cached.isPresent()) {
+                inFlight.remove(key, created);
+                created.complete(toResult(cacheKey, cached.orElseThrow()));
+                return detached(created);
+            }
         }
 
         if (automatic) {
@@ -113,7 +180,9 @@ public final class ChatTranslationService {
         TranslationRequest request = new TranslationRequest(text, resolvedTargetLanguage, resolvedSourceHint, automatic);
         ExecutorService currentExecutor = ensureExecutor(config.maxConcurrentTranslations);
         try {
-            currentExecutor.execute(() -> executeTranslation(key, created, provider, request, config, providerId));
+            currentExecutor.execute(() -> executeTranslation(
+                key, created, cacheKey, provider, request, config, providerId, useCache
+            ));
         } catch (RuntimeException e) {
             completeFailure(key, created, TranslationException.caused(
                 TranslationException.Kind.UNKNOWN, "Translation could not be scheduled.", providerId, e
@@ -125,19 +194,40 @@ public final class ChatTranslationService {
     private void executeTranslation(
         TranslationKey key,
         CompletableFuture<TranslationResult> shared,
+        TranslationCache.Key cacheKey,
         TranslationProvider provider,
         TranslationRequest request,
         ChatglotConfig config,
-        String providerId
+        String providerId,
+        boolean useCache
     ) {
         long startedAtNanos = System.nanoTime();
         long budgetNanos = Duration.ofSeconds(config.requestTimeoutSeconds).toNanos();
         int retriesUsed = 0;
         ChatglotConfig attemptConfig = config;
         while (true) {
+            if (request.automatic()) {
+                Optional<TranslationException> breakerFailure = circuitBreaker.failureIfBlocked(providerId, config);
+                if (breakerFailure.isPresent()) {
+                    completeFailure(key, shared, breakerFailure.orElseThrow());
+                    return;
+                }
+            }
             try {
                 TranslationResult result = provider.translate(request, attemptConfig, configDir, gameDir);
                 circuitBreaker.recordSuccess(providerId);
+                if (useCache && config.translationCacheEnabled && result != null
+                    && result.translatedText() != null && !result.translatedText().isBlank()) {
+                    translationCache.put(
+                        cacheKey,
+                        new TranslationCache.Entry(
+                            result.translatedText(),
+                            result.detectedSourceLanguage() == null ? "" : result.detectedSourceLanguage(),
+                            System.currentTimeMillis()
+                        ),
+                        config.translationCacheMaxEntries
+                    );
+                }
                 inFlight.remove(key, shared);
                 shared.complete(result);
                 return;
@@ -230,12 +320,12 @@ public final class ChatTranslationService {
 
     private static String resolveProviderId(String configuredProviderId) {
         if (configuredProviderId == null || configuredProviderId.isBlank()) {
-            return "gas";
+            return "google_web";
         }
 
         String normalized = configuredProviderId.trim().toLowerCase(Locale.ROOT);
         if (ChatglotConfig.DEFAULT_PROVIDER.equals(normalized)) {
-            return "gas";
+            return "google_web";
         }
         return normalized;
     }
@@ -248,6 +338,7 @@ public final class ChatTranslationService {
                 executorParallelism = 0;
             }
         }
+        translationCache.shutdown();
     }
 
     private ExecutorService ensureExecutor(int parallelism) {
@@ -267,16 +358,73 @@ public final class ChatTranslationService {
         }
     }
 
+    private static TranslationResult toResult(TranslationCache.Key key, TranslationCache.Entry entry) {
+        return new TranslationResult(entry.translatedText(), entry.detectedSourceLanguage(), key.providerId());
+    }
+
+    private static String outputSettingsFingerprint(String providerId, ChatglotConfig config) {
+        JsonObject settings = new JsonObject();
+        switch (providerId) {
+            case "gas" -> settings.addProperty("url", safeEndpoint(config.gasWebAppUrl));
+            case "deepl" -> settings.addProperty("free", config.deeplUseFreeApi);
+            case "codex" -> {
+                settings.addProperty("model", config.codexModel);
+                settings.addProperty("effort", config.codexReasoningEffort);
+                settings.addProperty("summary", config.codexReasoningSummary);
+            }
+            case "openai" -> settings.addProperty("model", config.openaiModel);
+            case "custom_llm" -> {
+                settings.addProperty("url", safeEndpoint(config.openaiCompatibleBaseUrl));
+                settings.addProperty("protocol", config.openaiCompatibleProtocol);
+                settings.addProperty("model", config.openaiCompatibleModel);
+            }
+            case "gemini" -> settings.addProperty("model", config.geminiModel);
+            case "anthropic" -> settings.addProperty("model", config.anthropicModel);
+            case "azure" -> {
+                settings.addProperty("endpoint", safeEndpoint(config.azureTranslatorEndpoint));
+                settings.addProperty("region", config.azureTranslatorRegion);
+            }
+            case "translategemma_local" -> {
+                settings.addProperty("baseUrl", safeEndpoint(config.localBackendBaseUrl));
+                settings.addProperty("port", config.localBackendPort);
+                settings.addProperty("modelAlias", config.localModelAlias);
+                settings.addProperty("modelPath", config.localModelPath);
+                settings.addProperty("modelFileName", config.localModelFileName);
+            }
+            default -> { }
+        }
+        return settings.toString();
+    }
+
+    private static String safeEndpoint(String endpoint) {
+        if (endpoint == null || endpoint.isBlank()) {
+            return "";
+        }
+        try {
+            URI uri = URI.create(endpoint.trim());
+            if (uri.getScheme() == null || uri.getHost() == null) {
+                return "";
+            }
+            // Keep the endpoint path to distinguish deployments/routes, but omit user info and query
+            // parameters because custom URLs can put credentials in either location.
+            return new URI(
+                uri.getScheme().toLowerCase(Locale.ROOT),
+                null,
+                uri.getHost().toLowerCase(Locale.ROOT),
+                uri.getPort(),
+                uri.getPath(),
+                null,
+                null
+            ).toASCIIString();
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
     // Saving or reloading config replaces the instance, and ChatglotConfig keeps identity equality.
-    // Including it prevents a request made after a model, endpoint or key change from joining a
-    // provider call that is still running with the previous settings.
-    private record TranslationKey(
-        String text,
-        String targetLanguage,
-        String sourceLanguageHint,
-        String providerId,
-        ChatglotConfig config
-    ) { }
+    // Including it prevents a request made after a model, endpoint or key change from joining an
+    // in-flight provider call that still uses the previous settings.
+    private record TranslationKey(TranslationCache.Key cacheKey, ChatglotConfig config) { }
 
     private static final class ChatglotThreadFactory implements ThreadFactory {
         private final AtomicInteger threadCounter = new AtomicInteger(0);

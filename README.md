@@ -36,6 +36,8 @@ The project focuses on practical choice and transparency:
 
 - Translate button appended to every chat message (configurable label)
 - Click-to-translate or automatic translation
+- Free Google Translate web translation by default, with no key or setup required
+- Persistent local translation cache to avoid repeating the same provider request
 - Result shown as a new line **or** replaces the original chat message
 - Open the settings screen with `F8` or `/chatglot config`
 - Translate a specific message with `/chatglot translate <id>`
@@ -56,7 +58,8 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 
 | Provider | Requires |
 |---|---|
-| `default` | Nothing. Uses an author-operated free GAS endpoint. Rate-limited, and auto-translate is unavailable. |
+| `default` | Nothing. Uses Google's unofficial free web API, not the paid Cloud Translation API; no key, setup, or user server is required. Google may limit or change it without notice. |
+| `google_web` | Same unofficial Google Translate web API, selectable directly |
 | `gas` | Your own Google Apps Script web app URL |
 | `deepl` | DeepL API key |
 | `google` | Google Cloud Translation API key |
@@ -72,6 +75,7 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 
 ## Recommended Providers
 
+- **`default` / `google_web`**: Free and ready to use without setup. This unofficial web API can be limited or stopped without notice; switch to another provider if that happens.
 - **`GAS`**: Good if you want a free setup with your own Google account. Google Apps Script documents up to `5,000` Translate calls per day for consumer accounts, though quotas can change. See [Apps Script quotas](https://developers.google.com/apps-script/guides/services/quotas).
 - **`TranslateGemma`**: A strong option if your PC has enough headroom for local inference. After setup, it runs locally over `localhost`, can be fast, and does not require a paid API for each request. It does require downloading the `llama.cpp` runtime and a TranslateGemma GGUF model.
 - **`Codex`**: Recommended if you already subscribe to ChatGPT. OpenAI states that Codex is included with ChatGPT Plus, Pro, Business, Edu, and Enterprise plans, with plan-based limits. See [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan).
@@ -107,7 +111,11 @@ Key settings:
 - `requestTimeoutSeconds` — Network timeout (`5`-`240` seconds)
 - `maxConcurrentTranslations` — Max parallel translation requests (`1`-`16`)
   For `translategemma_local`, this also sets the managed `llama-server` `--parallel` value.
+- `translationCacheEnabled` — Enable the local persistent translation cache (default: `true`)
+- `translationCacheMaxEntries` — Maximum cache size, using least-recently-used eviction (default: `5000`)
 - `useSharedAppDataSettings` — Share API keys, model settings, and local backend settings through `%LOCALAPPDATA%`
+
+Successful translations are cached indefinitely until evicted by the LRU limit or cleared. Cache keys include the provider, languages, original text, and output-affecting provider settings; credentials and display settings are excluded. The file is `config/chatglot/translation-cache.json`. Clear it with `/chatglot cache clear` or the **Clear translation cache** button in settings. The file contains original text, including chat messages, in plain text.
 
 ---
 
@@ -156,7 +164,7 @@ Manually translating a sign also sends the text on its visible face to the selec
 
 Translating a chat draft sends the text in the input field to the selected provider only when you press the translate button. Typing, opening the language picker, and previewing the field do not send the draft. The outgoing language setting is separate from the target used for incoming chat translation. With local TranslateGemma, the draft is sent only to the local backend.
 
-- **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
+- **`default` / `google_web` providers**: Chat text is sent to Google's unofficial web translation API. It is free and requires no user setup, but Google may limit or change access without notice. Use another provider if it becomes unavailable.
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`openai` provider**: Chat text is sent to the OpenAI API using your API key. See [OpenAI data controls](https://platform.openai.com/docs/guides/your-data/).
 - **`custom_llm` provider**: Chat text is sent to the custom Base URL that you configure. Select either OpenResponses (`/responses`) or Chat Completions (`/chat/completions`) format. The API key is optional for local servers.

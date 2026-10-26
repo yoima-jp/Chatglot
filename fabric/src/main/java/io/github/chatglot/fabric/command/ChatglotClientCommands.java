@@ -41,6 +41,8 @@ public final class ChatglotClientCommands {
                     )
                     .then(ClientCommands.literal("config").executes(context -> openConfig(context.getSource())))
                     .then(ClientCommands.literal("diagnose").executes(context -> diagnose(context.getSource())))
+                    .then(ClientCommands.literal("cache")
+                        .then(ClientCommands.literal("clear").executes(context -> clearCache(context.getSource()))))
                     .then(ClientCommands.literal("save").executes(context -> saveConfig(context.getSource())))
             )
         );
@@ -144,7 +146,7 @@ public final class ChatglotClientCommands {
         String targetLanguage = LanguageUtil.resolveConfiguredTargetLanguage(config.targetLanguage);
         long startedAt = System.nanoTime();
         try {
-            runtime.translationService().translate(DIAGNOSTIC_TEXT, targetLanguage, "", false)
+            runtime.translationService().translateWithoutCache(DIAGNOSTIC_TEXT, targetLanguage, "", false)
                 .whenComplete((result, error) -> {
                     long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000L;
                     client.execute(() -> {
@@ -184,9 +186,17 @@ public final class ChatglotClientCommands {
     }
 
     private static int saveConfig(FabricClientCommandSource source) {
-        ChatglotRuntime.get().configManager().save();
+        ChatglotRuntime runtime = ChatglotRuntime.get();
+        runtime.configManager().save();
+        runtime.translationCache().setMaxEntries(runtime.configManager().get().translationCacheMaxEntries);
         source.sendFeedback(Component.translatable("chatglot.command.config.saved").withStyle(ChatFormatting.GRAY));
         ChatOutput.postInfo("Config saved.");
+        return 1;
+    }
+
+    private static int clearCache(FabricClientCommandSource source) {
+        ChatglotRuntime.get().translationCache().clear();
+        source.sendFeedback(Component.translatable("chatglot.command.cache.cleared").withStyle(ChatFormatting.GRAY));
         return 1;
     }
 }

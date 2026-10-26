@@ -99,9 +99,6 @@ public final class GasTranslationProvider implements TranslationProvider {
         if (config == null) {
             return "";
         }
-        if (ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(config.provider)) {
-            return ChatglotConfig.GAS_DEFAULT_WEB_APP_URL;
-        }
         if (config.gasWebAppUrl == null) {
             return "";
         }

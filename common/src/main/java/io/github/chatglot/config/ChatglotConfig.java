@@ -9,8 +9,9 @@ public class ChatglotConfig {
     public static final String DEFAULT_TRANSLATE_BUTTON_LABEL = "✍";
     public static final String LEGACY_TRANSLATE_BUTTON_LABEL = "✍️";
     public static final String DEFAULT_PROVIDER = "default";
-    public static final String GAS_DEFAULT_WEB_APP_URL =
-        "https://script.google.com/macros/s/AKfycbyCriKw2zjqBZR1x_9u5pf16vzWuxGP7EO8UJ3AgoV8QpOto-hzmutBZS3eaNYZmlqw/exec";
+    public static final int CURRENT_CONFIG_VERSION = 1;
+    public static final int TRANSLATION_CACHE_MIN_ENTRIES = 100;
+    public static final int TRANSLATION_CACHE_MAX_ENTRIES = 50000;
     public static final String CODEX_DEFAULT_MODEL = "gpt-5.6-luna";
     public static final String OPENAI_DEFAULT_MODEL = "gpt-5.6-luna";
     private static final String LEGACY_OPENAI_DEFAULT_MODEL = "gpt-5-nano";
@@ -32,6 +33,7 @@ public class ChatglotConfig {
     public static final String CODEX_REASONING_EFFORT_EXTRA_HIGH = "xhigh";
 
     public boolean enabled = true;
+    public int configVersion = CURRENT_CONFIG_VERSION;
     public boolean appendTranslateButton = true;
     public String translateButtonLabel = DEFAULT_TRANSLATE_BUTTON_LABEL;
 
@@ -88,10 +90,13 @@ public class ChatglotConfig {
 
     public int requestTimeoutSeconds = 45;
     public int maxConcurrentTranslations = 1;
+    public boolean translationCacheEnabled = true;
+    public int translationCacheMaxEntries = 5000;
 
     public ChatglotConfig copy() {
         ChatglotConfig copy = new ChatglotConfig();
         copy.enabled = enabled;
+        copy.configVersion = configVersion;
         copy.appendTranslateButton = appendTranslateButton;
         copy.translateButtonLabel = translateButtonLabel;
         copy.autoTranslateEnabled = autoTranslateEnabled;
@@ -139,6 +144,8 @@ public class ChatglotConfig {
         copy.localModelDownloadUrl = localModelDownloadUrl;
         copy.requestTimeoutSeconds = requestTimeoutSeconds;
         copy.maxConcurrentTranslations = maxConcurrentTranslations;
+        copy.translationCacheEnabled = translationCacheEnabled;
+        copy.translationCacheMaxEntries = translationCacheMaxEntries;
         return copy;
     }
 
@@ -148,6 +155,7 @@ public class ChatglotConfig {
         }
 
         enabled = other.enabled;
+        configVersion = other.configVersion;
         appendTranslateButton = other.appendTranslateButton;
         translateButtonLabel = other.translateButtonLabel;
         autoTranslateEnabled = other.autoTranslateEnabled;
@@ -194,6 +202,8 @@ public class ChatglotConfig {
         localModelDownloadUrl = other.localModelDownloadUrl;
         requestTimeoutSeconds = other.requestTimeoutSeconds;
         maxConcurrentTranslations = other.maxConcurrentTranslations;
+        translationCacheEnabled = other.translationCacheEnabled;
+        translationCacheMaxEntries = other.translationCacheMaxEntries;
     }
 
     public ChatglotConfig extractSharedSettings() {
@@ -264,7 +274,7 @@ public class ChatglotConfig {
             provider = "custom_llm";
         }
         switch (provider) {
-            case "default", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini", "anthropic", "azure", "translategemma_local" -> {
+            case "default", "google_web", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini", "anthropic", "azure", "translategemma_local" -> {
             }
             default -> provider = DEFAULT_PROVIDER;
         }
@@ -291,6 +301,10 @@ public class ChatglotConfig {
         if (maxConcurrentTranslations > 16) {
             maxConcurrentTranslations = 16;
         }
+        translationCacheMaxEntries = Math.max(
+            TRANSLATION_CACHE_MIN_ENTRIES,
+            Math.min(TRANSLATION_CACHE_MAX_ENTRIES, translationCacheMaxEntries)
+        );
 
         if (deeplApiKey == null) {
             deeplApiKey = "";
@@ -415,7 +429,7 @@ public class ChatglotConfig {
         }
         codexReasoningSummary = codexReasoningSummary.trim();
 
-        autoTranslateEnabled = autoTranslateEnabledWhenSupported && !DEFAULT_PROVIDER.equals(provider);
+        autoTranslateEnabled = autoTranslateEnabledWhenSupported;
     }
 
     private static String normalizeOutgoingLanguage(String language) {

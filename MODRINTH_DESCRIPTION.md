@@ -11,6 +11,8 @@ Client-side only. No server installation is required.
 
 - Translate button appended to every chat message (configurable label)
 - Click-to-translate or automatic translation
+- Free Google Translate web translation by default; no API key or setup required
+- Persistent local cache to reuse successful translations
 - Result shown as a new line **or** replaces the original chat message
 - Open the settings screen with `F8` or `/chatglot config`
 - Translate a specific message with `/chatglot translate <id>`
@@ -29,7 +31,8 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 
 | Provider | Requires |
 |---|---|
-| `default` | Nothing. Uses an author-operated free GAS endpoint. Rate-limited, and auto-translate is unavailable. |
+| `default` | Nothing. Google's unofficial free web API, not paid Cloud Translation; no key or setup required, but it may be limited or changed without notice. |
+| `google_web` | Same unofficial Google Translate web API, selectable directly |
 | `gas` | Your own Google Apps Script web app URL |
 | `deepl` | DeepL API key |
 | `google` | Google Cloud Translation API key |
@@ -74,6 +77,10 @@ Key settings:
 - `showTranslationPrefix` — Show or hide the translated-message prefix
 - `requestTimeoutSeconds` — Network timeout (`5`-`240` seconds)
 - `maxConcurrentTranslations` — Max parallel translation requests (`1`-`16`)
+- `translationCacheEnabled` — Enable the local persistent translation cache (default: `true`)
+- `translationCacheMaxEntries` — Maximum LRU entries (default: `5000`)
+
+Successful results stay cached until LRU eviction or deletion. The cache is stored in `config/chatglot/translation-cache.json`; delete it with `/chatglot cache clear` or the settings button. It stores original text, including chat messages, in plain text. Cache keys omit API keys and other credentials.
 
 ---
 
@@ -85,7 +92,7 @@ Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected p
 
 Manually translating a sign sends its visible text to the selected provider. Manually translating a page in a written, lectern, or writable book sends only that page's text to the selected provider. Translating a writable book never changes its page contents. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
 
-- **`default` provider**: Chat text is sent to an author-operated Google Apps Script endpoint. However, requests pass through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
+- **`default` / `google_web` providers**: Chat text is sent to Google's unofficial web translation API. It is free and needs no user setup, but access may be limited or changed without notice; switch providers if it becomes unavailable.
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`openai` provider**: Chat text is sent to the OpenAI API using your API key. See [OpenAI data controls](https://platform.openai.com/docs/guides/your-data/).
 - **`codex` provider**: Uses browser-based OAuth, stores the token locally, and then uses that token to send chat text to OpenAI services. The mod also fetches the available model list from [`https://modelapi.yoima.com/api/codex-models/list`](https://modelapi.yoima.com/api/codex-models/list). No chat content is sent to that model-list endpoint.

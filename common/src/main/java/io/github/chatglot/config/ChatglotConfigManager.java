@@ -2,6 +2,8 @@ package io.github.chatglot.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonParser;
 import io.github.chatglot.ChatglotConstants;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -18,6 +20,9 @@ public final class ChatglotConfigManager {
     private ChatglotConfig config;
     private ChatglotConfig persistedConfig;
     private boolean createdNewConfigFile;
+    private boolean configMigrationNeedsSave;
+    private boolean sharedSettingsLoadedFromFile;
+    private boolean sharedSettingsVersionMissing;
 
     public ChatglotConfigManager(Path configDir) {
         Path modDir = ChatglotStoragePaths.resolveModConfigRoot(configDir);
@@ -25,6 +30,9 @@ public final class ChatglotConfigManager {
         this.sharedPath = ChatglotStoragePaths.resolveSharedSettingsFile();
         this.config = load();
         this.persistedConfig = this.config.copy();
+        if (configMigrationNeedsSave) {
+            save();
+        }
     }
 
     public synchronized ChatglotConfig get() {
@@ -34,6 +42,9 @@ public final class ChatglotConfigManager {
     public synchronized void reload() {
         this.config = load();
         this.persistedConfig = this.config.copy();
+        if (configMigrationNeedsSave) {
+            save();
+        }
     }
 
     public synchronized boolean createdNewConfigFile() {
@@ -78,6 +89,9 @@ public final class ChatglotConfigManager {
     }
 
     private ChatglotConfig load() {
+        configMigrationNeedsSave = false;
+        sharedSettingsLoadedFromFile = false;
+        sharedSettingsVersionMissing = false;
         try {
             Files.createDirectories(path.getParent());
             if (!Files.exists(path)) {
@@ -93,14 +107,33 @@ public final class ChatglotConfigManager {
             if (loaded == null) {
                 loaded = new ChatglotConfig();
             }
+            boolean configVersionMissing = isConfigVersionMissing(raw);
             boolean migratedLegacySharedPreference = migrateLegacySharedStoragePreference(raw, loaded);
             if (loaded.useSharedAppDataSettings) {
                 loaded.applySharedSettingsFrom(loadSharedSettings(migratedLegacySharedPreference ? loaded : null));
+                if (sharedSettingsLoadedFromFile) {
+                    configVersionMissing = sharedSettingsVersionMissing;
+                } else if (!migratedLegacySharedPreference) {
+                    configVersionMissing = false;
+                }
+            }
+            if (configVersionMissing || loaded.configVersion < ChatglotConfig.CURRENT_CONFIG_VERSION) {
+                String provider = loaded.provider == null ? "" : loaded.provider.trim();
+                if (ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(provider)) {
+                    // Earlier releases disabled default-provider auto-translation; preserve that choice on upgrade.
+                    loaded.autoTranslateEnabledWhenSupported = false;
+                    loaded.autoTranslateEnabled = false;
+                }
+                loaded.configVersion = ChatglotConfig.CURRENT_CONFIG_VERSION;
+                configMigrationNeedsSave = true;
+            } else {
+                configMigrationNeedsSave = false;
             }
             loaded.sanitize();
             createdNewConfigFile = false;
             return loaded;
         } catch (Exception e) {
+            configMigrationNeedsSave = false;
             LOGGER.error("Failed to load config, using defaults: {}", path, e);
             ChatglotConfig defaults = new ChatglotConfig();
             defaults.sanitize();
@@ -113,16 +146,23 @@ public final class ChatglotConfigManager {
         try {
             Files.createDirectories(sharedPath.getParent());
             if (!Files.exists(sharedPath)) {
+                sharedSettingsLoadedFromFile = false;
+                sharedSettingsVersionMissing = false;
                 return fallback != null ? fallback.extractSharedSettings() : new ChatglotConfig();
             }
 
-            ChatglotConfig shared = GSON.fromJson(Files.readString(sharedPath), ChatglotConfig.class);
+            String raw = Files.readString(sharedPath);
+            sharedSettingsLoadedFromFile = true;
+            sharedSettingsVersionMissing = isConfigVersionMissing(raw);
+            ChatglotConfig shared = GSON.fromJson(raw, ChatglotConfig.class);
             if (shared == null) {
                 shared = fallback != null ? fallback.extractSharedSettings() : new ChatglotConfig();
             }
             shared.sanitize();
             return shared;
         } catch (Exception e) {
+            sharedSettingsLoadedFromFile = false;
+            sharedSettingsVersionMissing = false;
             LOGGER.warn("Failed to load shared Chatglot settings: {}", sharedPath, e);
             return fallback != null ? fallback.extractSharedSettings() : new ChatglotConfig();
         }
@@ -138,5 +178,14 @@ public final class ChatglotConfigManager {
             return true;
         }
         return false;
+    }
+
+    private static boolean isConfigVersionMissing(String raw) {
+        try {
+            JsonElement root = JsonParser.parseString(raw);
+            return !root.isJsonObject() || !root.getAsJsonObject().has("configVersion");
+        } catch (RuntimeException ignored) {
+            return true;
+        }
     }
 }

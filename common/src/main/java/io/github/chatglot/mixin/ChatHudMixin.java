@@ -175,9 +175,6 @@ public abstract class ChatHudMixin {
     }
 
     private static boolean isAutoTranslateProviderSupported(String providerId) {
-        if (providerId == null || providerId.isBlank()) {
-            return false;
-        }
-        return !ChatglotConfig.DEFAULT_PROVIDER.equalsIgnoreCase(providerId.trim());
+        return providerId != null && !providerId.isBlank();
     }
 }

@@ -1,9 +1,12 @@
 package io.github.chatglot;
 
 import io.github.chatglot.config.ChatglotConfigManager;
+import io.github.chatglot.config.ChatglotStoragePaths;
 import io.github.chatglot.localbackend.LocalBackendManager;
 import io.github.chatglot.translation.ChatTranslationService;
 import io.github.chatglot.translation.LanguageDetectorService;
+import io.github.chatglot.translation.TranslationCache;
+import io.github.chatglot.translation.TranslationCircuitBreaker;
 import io.github.chatglot.translation.TranslationProviderRegistry;
 import io.github.chatglot.translation.TranslationRequestStore;
 import io.github.chatglot.translation.provider.AnthropicTranslationProvider;
@@ -13,6 +16,7 @@ import io.github.chatglot.translation.provider.DeepLTranslationProvider;
 import io.github.chatglot.translation.provider.GasTranslationProvider;
 import io.github.chatglot.translation.provider.GeminiTranslationProvider;
 import io.github.chatglot.translation.provider.GoogleTranslationProvider;
+import io.github.chatglot.translation.provider.GoogleWebTranslationProvider;
 import io.github.chatglot.translation.provider.OpenAiTranslationProvider;
 import io.github.chatglot.translation.provider.OpenAiCompatibleTranslationProvider;
 import io.github.chatglot.translation.provider.TranslateGemmaLocalTranslationProvider;
@@ -30,6 +34,7 @@ public final class ChatglotRuntime {
     private final ChatglotConfigManager configManager;
     private final TranslationProviderRegistry providerRegistry;
     private final ChatTranslationService translationService;
+    private final TranslationCache translationCache;
     private final LanguageDetectorService languageDetectorService;
     private final TranslationRequestStore requestStore;
     private final LocalBackendManager localBackendManager;
@@ -42,6 +47,10 @@ public final class ChatglotRuntime {
         this.configDir = configDir;
         this.gameDir = gameDir;
         this.configManager = new ChatglotConfigManager(configDir);
+        this.translationCache = new TranslationCache(
+            ChatglotStoragePaths.resolveTranslationCacheFile(configDir),
+            configManager.get().translationCacheMaxEntries
+        );
         this.codexModelCatalogService = new CodexModelCatalogService(configDir);
         this.codexModelCatalogService.initializeIfNeeded();
         this.openAiModelCatalogService = new OpenAiModelCatalogService(configDir);
@@ -51,6 +60,7 @@ public final class ChatglotRuntime {
         this.localBackendManager = new LocalBackendManager(configDir);
         this.providerRegistry.register(new DeepLTranslationProvider());
         this.providerRegistry.register(new GoogleTranslationProvider());
+        this.providerRegistry.register(new GoogleWebTranslationProvider());
         this.providerRegistry.register(new GasTranslationProvider());
         this.providerRegistry.register(new CodexTranslationProvider());
         this.providerRegistry.register(new OpenAiTranslationProvider());
@@ -59,7 +69,14 @@ public final class ChatglotRuntime {
         this.providerRegistry.register(new AnthropicTranslationProvider());
         this.providerRegistry.register(new AzureTranslatorTranslationProvider());
         this.providerRegistry.register(new TranslateGemmaLocalTranslationProvider(localBackendManager));
-        this.translationService = new ChatTranslationService(configManager, providerRegistry, configDir, gameDir);
+        this.translationService = new ChatTranslationService(
+            configManager,
+            providerRegistry,
+            configDir,
+            gameDir,
+            new TranslationCircuitBreaker(),
+            translationCache
+        );
         this.languageDetectorService = new LanguageDetectorService();
         this.requestStore = new TranslationRequestStore();
     }
@@ -104,6 +121,10 @@ public final class ChatglotRuntime {
 
     public ChatTranslationService translationService() {
         return translationService;
+    }
+
+    public TranslationCache translationCache() {
+        return translationCache;
     }
 
     public LanguageDetectorService languageDetectorService() {

@@ -445,24 +445,25 @@ function jsonResponse(data) {
             16,
             1
         );
+        BooleanOption translationCacheEnabled = booleanOption(
+            "translation_cache_enabled",
+            "chatglot.config.translation_cache_enabled",
+            config.translationCacheEnabled
+        );
+        IntegerOption translationCacheMaxEntries = integerOption(
+            "translation_cache_max_entries",
+            "chatglot.config.translation_cache_max_entries",
+            config.translationCacheMaxEntries,
+            ChatglotConfig.TRANSLATION_CACHE_MIN_ENTRIES,
+            ChatglotConfig.TRANSLATION_CACHE_MAX_ENTRIES,
+            100
+        );
 
-        // Wire provider change to the same sanitize rules used by the old Cloth screen.
-        provider.onChanged(value -> {
-            config.provider = value.id();
-            if (value == ProviderOption.DEFAULT) {
-                config.autoTranslateEnabledWhenSupported = false;
-                config.autoTranslateEnabled = false;
-                autoTranslate.trySetValue(false);
-            } else if (config.autoTranslateEnabledWhenSupported) {
-                config.autoTranslateEnabled = true;
-                autoTranslate.trySetValue(true);
-            }
-        });
+        provider.onChanged(value -> config.provider = value.id());
 
         autoTranslate.onChanged(value -> {
-            ProviderOption currentProvider = provider.draftValue();
             config.autoTranslateEnabledWhenSupported = value;
-            config.autoTranslateEnabled = currentProvider != ProviderOption.DEFAULT && value;
+            config.autoTranslateEnabled = value;
         });
 
         // Provider-specific options
@@ -578,6 +579,15 @@ function jsonResponse(data) {
             .addOption(useSharedAppData)
             .addOption(requestTimeout)
             .addOption(maxConcurrent)
+            .addOption(translationCacheEnabled)
+            .addOption(translationCacheMaxEntries)
+            .buttonOption(
+                "translation_cache_clear",
+                ConfigText.translatable("chatglot.config.translation_cache_clear"),
+                ConfigText.empty(),
+                ConfigText.translatable("chatglot.config.translation_cache_clear"),
+                () -> clearTranslationCache(runtime)
+            )
             .categoryKey(CAT_GAS, "chatglot.config.category.provider.gas")
             .addOption(gasUrl)
             .buttonOption("gas_copy_script", ConfigText.translatable("chatglot.config.gas_copy_script"),
@@ -738,6 +748,7 @@ function jsonResponse(data) {
         config.sanitize();
         runtime.configManager().save();
         config = runtime.configManager().get();
+        runtime.translationCache().setMaxEntries(config.translationCacheMaxEntries);
         runtime.localBackendManager().applyConfiguredBackendPolicyAsync(config);
     }
 
@@ -758,6 +769,8 @@ function jsonResponse(data) {
             case "use_shared_appdata_settings" -> config.useSharedAppDataSettings = (Boolean) draft;
             case "request_timeout" -> config.requestTimeoutSeconds = (Integer) draft;
             case "max_concurrent_translations" -> config.maxConcurrentTranslations = (Integer) draft;
+            case "translation_cache_enabled" -> config.translationCacheEnabled = (Boolean) draft;
+            case "translation_cache_max_entries" -> config.translationCacheMaxEntries = (Integer) draft;
             case "deepl_key" -> config.deeplApiKey = (String) draft;
             case "deepl_free" -> config.deeplUseFreeApi = (Boolean) draft;
             case "google_key" -> config.googleTranslateApiKey = (String) draft;
@@ -930,6 +943,11 @@ function jsonResponse(data) {
         } catch (IOException error) {
             LOGGER.warn("Failed to open external URL: {}", url, error);
         }
+    }
+
+    private static void clearTranslationCache(ChatglotRuntime runtime) {
+        runtime.translationCache().clear();
+        ChatOutput.post(Component.translatable("chatglot.config.translation_cache_cleared"));
     }
 
     private interface LocalBackendAction {
@@ -1278,6 +1296,7 @@ function jsonResponse(data) {
 
     private enum ProviderOption {
         DEFAULT("default"),
+        GOOGLE_WEB("google_web"),
         GAS("gas"),
         DEEPL("deepl"),
         GOOGLE("google"),
@@ -1305,6 +1324,7 @@ function jsonResponse(data) {
             }
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
                 case "default" -> DEFAULT;
+                case "google_web" -> GOOGLE_WEB;
                 case "gas" -> GAS;
                 case "deepl" -> DEEPL;
                 case "google" -> GOOGLE;

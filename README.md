@@ -171,6 +171,10 @@ Translating a chat draft sends the text in the input field to the selected provi
 ---
 
 
+## Developer workflow
+
+Run `./gradlew :fabric:runClientGameTest` to launch the client game tests; screenshots are saved under `fabric/run/clientGameTest/screenshots`.
+
 ## Source & License
 
 Source code: [GitHub — yoima-jp/Chatglot](https://github.com/yoima-jp/Chatglot)  

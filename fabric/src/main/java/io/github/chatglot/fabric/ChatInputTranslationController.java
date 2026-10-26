@@ -192,9 +192,9 @@ public final class ChatInputTranslationController {
             return;
         }
         int controlsX = state.input.getX() + state.input.getWidth() + BUTTON_GAP;
-        state.languageButton.setRectangle(controlsX, state.input.getY(),
+        place(state.languageButton, controlsX, state.input.getY(),
             state.languageButtonWidth, state.input.getHeight());
-        state.translateButton.setRectangle(controlsX + state.languageButtonWidth + BUTTON_GAP,
+        place(state.translateButton, controlsX + state.languageButtonWidth + BUTTON_GAP,
             state.input.getY(), TRANSLATE_BUTTON_WIDTH, state.input.getHeight());
     }
 
@@ -309,7 +309,7 @@ public final class ChatInputTranslationController {
         state.preview.update(previewX, previewY, previewWidth, previewHeight, code,
             state.translation.translation(), status, state.translation.failure(),
             state.translation.tooLong(), canApply, config.provider);
-        state.closePreviewButton.setRectangle(previewX + previewWidth + 4, previewY, 22, 20);
+        place(state.closePreviewButton, previewX + previewWidth + 4, previewY, 22, 20);
         state.closePreviewButton.active = true;
         if (status == Status.FAILED) {
             state.preview.setTooltip(Tooltip.create(TranslationErrorMessages.chat(
@@ -544,6 +544,13 @@ public final class ChatInputTranslationController {
 
     // String.isBlank() は NBSP (U+00A0) などを空白と見なさないが、ChatScreen.normalizeChatMessage は
     // それらも取り除く。送信時に空になる入力を provider へ送らないよう、送信と同じ正規化で判定する。
+    // AbstractWidget.setRectangle は (width, height, x, y) の順で、(x, y, width, height) と取り違えやすい。
+    // 取り違えるとボタンが画面全体を覆うため、名前付きの setPosition / setSize で配置する。
+    private static void place(AbstractWidget widget, int x, int y, int width, int height) {
+        widget.setPosition(x, y);
+        widget.setSize(width, height);
+    }
+
     private static boolean isBlankMessage(ChatScreen screen, String value) {
         if (value == null || value.isBlank()) {
             return true;
@@ -665,7 +672,7 @@ public final class ChatInputTranslationController {
             this.failure = failure;
             this.tooLong = tooLong;
             this.provider = provider;
-            setRectangle(x, y, width, height);
+            place(this, x, y, width, height);
             this.active = canApply;
         }
 

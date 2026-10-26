@@ -31,6 +31,16 @@ loom {
     }
 }
 
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "${rootProject.mod_id}-gametest"
+        enableGameTests = false
+        enableClientGameTests = true
+        eula = true
+    }
+}
+
 jar {
     from(project(':common').sourceSets.main.output)
 }

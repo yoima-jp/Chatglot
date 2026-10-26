@@ -172,7 +172,7 @@
   "chatglot.input.language_button": "%s ▾",
   "chatglot.input.preview": "→ %s: %s",
   "chatglot.input.loading_preview": "→ %s: 翻訳中…",
-  "chatglot.input.tab_hint": "Tab で適用",
+  "chatglot.input.tab_hint": "クリック / Tab で適用",
   "chatglot.input.close": "×",
   "chatglot.input.discard": "翻訳を破棄",
   "chatglot.input.recent": "最近使った言語",

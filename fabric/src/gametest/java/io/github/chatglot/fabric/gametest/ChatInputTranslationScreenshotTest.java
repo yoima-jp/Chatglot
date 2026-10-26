@@ -85,6 +85,19 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
             moveToButton(context, translateButton);
             context.waitTicks(20);
             context.takeScreenshot("08-command");
+
+            chat = reopenChat(context);
+            type(context, FakeProvider.CLICK_INPUT);
+            clickButton(context, chat, "chatglot.input.translate");
+            waitForTranslation(context, FakeProvider.CLICK_INPUT);
+            clickPreview(context, chat);
+            ChatScreen clickedChat = chat;
+            boolean clickApplied = context.computeOnClient(client ->
+                FakeProvider.CLICK_TRANSLATION.equals(((ChatScreenAccessor) clickedChat).chatglot$getInput().getValue()));
+            if (!clickApplied) {
+                throw new IllegalStateException("Clicking the preview should apply the translation.");
+            }
+            context.takeScreenshot("09-click-applied");
         }
         } finally {
             FakeProvider.releaseFirstRequest();
@@ -187,6 +200,20 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
                 && contents.getKey().equals("chatglot.input.recent")));
     }
 
+    // The preview is not a Button, so locate it by its position above the input instead of by label.
+    static void clickPreview(ClientGameTestContext context, ChatScreen screen) {
+        double[] position = context.computeOnClient(client -> {
+            var input = ((ChatScreenAccessor) screen).chatglot$getInput();
+            double scaleX = client.getWindow().getScreenWidth() / (double) client.getWindow().getGuiScaledWidth();
+            double scaleY = client.getWindow().getScreenHeight() / (double) client.getWindow().getGuiScaledHeight();
+            return new double[] {(input.getX() + 40) * scaleX, (input.getY() - 12) * scaleY};
+        });
+        context.getInput().setCursorPos(position[0], position[1]);
+        context.getInput().pressMouse(InputConstants.MOUSE_BUTTON_LEFT);
+        context.waitTicks(3);
+        context.getInput().setCursorPos(0, 0);
+    }
+
     static Button findButton(ClientGameTestContext context, ChatScreen screen, String translationKey) {
         return context.computeOnClient(client -> Screens.getWidgets(screen).stream()
             .filter(Button.class::isInstance)
@@ -226,6 +253,8 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
         private static final String ID = "gas";
         private static final String ERROR_INPUT = "失敗ケース";
         private static final String LONG_INPUT = "長文の例";
+        private static final String CLICK_INPUT = "こんにちは";
+        private static final String CLICK_TRANSLATION = "Hello";
         private static final String LONG_TRANSLATION = "This is a long translation. ".repeat(11);
         private static final CountDownLatch FIRST_REQUEST_STARTED = new CountDownLatch(1);
         private static final CountDownLatch RELEASE_FIRST_REQUEST = new CountDownLatch(1);
@@ -283,6 +312,9 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
                         // NETWORK is retried by the service, which would capture the loading frame instead.
                         TranslationException.Kind.AUTH, "Screenshot test authentication failure.", ID
                     );
+                }
+                if (CLICK_INPUT.equals(request.text())) {
+                    return new TranslationResult(CLICK_TRANSLATION, "ja", ID);
                 }
                 if (LONG_INPUT.equals(request.text())) {
                     return new TranslationResult(LONG_TRANSLATION, "ja", ID);

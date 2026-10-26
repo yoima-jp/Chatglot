@@ -172,7 +172,7 @@
   "chatglot.input.language_button": "%s ▾",
   "chatglot.input.preview": "→ %s: %s",
   "chatglot.input.loading_preview": "→ %s: Translating…",
-  "chatglot.input.tab_hint": "Tab to apply",
+  "chatglot.input.tab_hint": "Click or Tab to apply",
   "chatglot.input.close": "×",
   "chatglot.input.discard": "Discard translation",
   "chatglot.input.recent": "Recent",

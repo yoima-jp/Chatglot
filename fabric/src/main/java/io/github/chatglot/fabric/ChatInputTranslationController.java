@@ -482,14 +482,21 @@ public final class ChatInputTranslationController {
         state.popup = popup;
         int count = Math.min(ChatInputTranslationState.RECENT_LANGUAGE_LIMIT, ChatglotRuntime.get()
             .configManager().get().recentOutgoingLanguages.size());
-        int recentWidth = count == 0 ? 0 : Math.max(24, (width - 66) / count);
+        Component recentLabel = Component.translatable("chatglot.input.recent");
+        // 見出しの幅は言語ごとに違う（日本語の「最近使った言語」は固定幅に収まらず、ボタンと重なっていた）。
+        int titleWidth = client.font.width(recentLabel);
+        int recentStart = x + 6 + titleWidth + 6;
+        int recentWidth = count == 0 ? 0 : Math.max(24, (x + width - 4 - recentStart) / count - 2);
+        // 背景はほかのポップアップ部品より先に追加し、最初に描かせる。
+        popup.background = new PopupBackgroundWidget(x, top, width, listTop + listHeight - top);
+        addMouseOnlyWidget(screen, popup.background);
         for (int index = 0; index < count; index++) {
             String recentCode = ChatglotRuntime.get().configManager().get().recentOutgoingLanguages.get(index);
             MinecraftLanguageCatalog.Option option = findLanguage(options, recentCode);
             if (option == null) {
                 continue;
             }
-            int buttonX = x + 58 + index * (recentWidth + 2);
+            int buttonX = recentStart + index * (recentWidth + 2);
             Button recentButton = Button.builder(Component.literal(languageCode(recentCode)), ignored ->
                     selectLanguage(screen, state, option))
                 .bounds(buttonX, top + 4, recentWidth, 20)
@@ -498,8 +505,7 @@ public final class ChatInputTranslationController {
             popup.recentButtons.add(recentButton);
             addMouseOnlyWidget(screen, recentButton);
         }
-        popup.title = new PopupTitleWidget(x + 6, top + 6, 50, 16,
-            Component.translatable("chatglot.input.recent"));
+        popup.title = new PopupTitleWidget(x + 6, top + 10, titleWidth, 12, recentLabel);
         addMouseOnlyWidget(screen, popup.title);
         Screens.getWidgets(screen).add(popup.list);
         state.input.setFocused(false);
@@ -623,6 +629,7 @@ public final class ChatInputTranslationController {
             }
             Screens.getWidgets(screen).remove(popup.title);
             Screens.getWidgets(screen).remove(popup.list);
+            Screens.getWidgets(screen).remove(popup.background);
             popup = null;
             if (hadFocus) {
                 restoreInputFocus(screen);
@@ -660,9 +667,30 @@ public final class ChatInputTranslationController {
                             boolean tooLong, boolean canApply, String provider, int maxHeight) {
             Component message = previewMessage(translation, status, failure, tooLong, language, provider);
             Font font = Minecraft.getInstance().font;
-            int textHeight = font.split(message, Math.max(1, width - 12)).size() * font.lineHeight;
-            int footerHeight = canApply || tooLong ? font.lineHeight : 0;
-            return Math.min(maxHeight, Math.max(34, textHeight + footerHeight + 8));
+            List<FormattedCharSequence> lines = font.split(message, Math.max(1, width - 12));
+            int textHeight = lines.size() * font.lineHeight;
+            Component footer = footer(tooLong, canApply);
+            boolean footerOnOwnLine = !footer.getString().isEmpty()
+                && !footerFitsLastLine(font, lines, footer, width);
+            int footerHeight = footerOnOwnLine ? font.lineHeight : 0;
+            // 20 は右隣の × ボタンの高さ。帯とボタンの高さを揃えて、1 行のときに段差が出ないようにする。
+            return Math.min(maxHeight, Math.max(20, textHeight + footerHeight + 8));
+        }
+
+        private static Component footer(boolean tooLong, boolean canApply) {
+            return tooLong
+                ? Component.translatable("chatglot.input.too_long")
+                : canApply ? Component.translatable("chatglot.input.tab_hint") : Component.empty();
+        }
+
+        // 1 行の翻訳文のためにヒント用の行を足すと、帯が背後の HUD を大きく覆う。収まるときは最終行の右端に置く。
+        private static boolean footerFitsLastLine(Font font, List<FormattedCharSequence> lines, Component footer,
+                                                  int width) {
+            if (lines.isEmpty()) {
+                return true;
+            }
+            int lastLineWidth = font.width(lines.get(lines.size() - 1));
+            return 6 + lastLineWidth + 12 + font.width(footer) + 6 <= width;
         }
 
         private void update(int x, int y, int width, int height, String language, String translation,
@@ -678,24 +706,31 @@ public final class ChatInputTranslationController {
 
         @Override
         protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+            // 26.x の GUI は同じ層の中で HUD のスプライト（ハート・ホットバー）を後から重ねることがあり、
+            // 実機スクリーンショットでは帯の文字の上にハートが描かれていた。新しい層に上げて HUD より手前に出す。
+            graphics.nextStratum();
             graphics.fill(getX(), getY(), getRight(), getBottom(), 0xE6101010);
             graphics.fill(getX(), getY(), getRight(), getY() + 1, 0xFF777777);
             Font font = Minecraft.getInstance().font;
             Component message = previewMessage(state.translation.translation(), status, failure,
                 tooLong, language, provider);
             List<FormattedCharSequence> lines = font.split(message, Math.max(1, getWidth() - 12));
+            Component footer = footer(tooLong, active);
+            boolean hasFooter = !footer.getString().isEmpty();
+            boolean footerOnOwnLine = hasFooter && !footerFitsLastLine(font, lines, footer, getWidth());
             int y = getY() + 4;
-            int footerHeight = active || tooLong ? font.lineHeight : 0;
+            int footerHeight = footerOnOwnLine ? font.lineHeight : 0;
             int visibleLines = Math.max(0, (getHeight() - footerHeight - 8) / font.lineHeight);
-            for (int index = 0; index < Math.min(lines.size(), visibleLines); index++) {
+            int shownLines = Math.min(lines.size(), visibleLines);
+            for (int index = 0; index < shownLines; index++) {
                 graphics.text(font, lines.get(index), getX() + 6, y + index * font.lineHeight,
                     status == Status.FAILED ? 0xFFFF6B6B : 0xFFFFFFFF, false);
             }
-            Component footer = tooLong
-                ? Component.translatable("chatglot.input.too_long")
-                : active ? Component.translatable("chatglot.input.tab_hint") : Component.empty();
-            if (!footer.getString().isEmpty()) {
-                graphics.text(font, footer, getRight() - font.width(footer) - 6, getBottom() - font.lineHeight - 3,
+            if (hasFooter) {
+                int footerY = footerOnOwnLine
+                    ? getBottom() - font.lineHeight - 3
+                    : y + Math.max(0, shownLines - 1) * font.lineHeight;
+                graphics.text(font, footer, getRight() - font.width(footer) - 6, footerY,
                     tooLong ? 0xFFFF6B6B : 0xFFAAAAAA, false);
             }
         }
@@ -719,6 +754,28 @@ public final class ChatInputTranslationController {
                     translation == null ? "" : translation);
                 case HIDDEN -> Component.empty();
             };
+        }
+    }
+
+    private static final class PopupBackgroundWidget extends AbstractWidget {
+        private PopupBackgroundWidget(int x, int y, int width, int height) {
+            super(x, y, width, height, Component.empty());
+            this.active = false;
+        }
+
+        @Override
+        protected void extractWidgetRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+            // プレビュー帯と同じ理由で HUD より手前の層に上げる。後から追加されるボタンとリストもこの層に乗る。
+            graphics.nextStratum();
+            graphics.fill(getX(), getY(), getRight(), getBottom(), 0xF0101010);
+            graphics.fill(getX(), getY(), getRight(), getY() + 1, 0xFF777777);
+            graphics.fill(getX(), getBottom() - 1, getRight(), getBottom(), 0xFF777777);
+            graphics.fill(getX(), getY(), getX() + 1, getBottom(), 0xFF777777);
+            graphics.fill(getRight() - 1, getY(), getRight(), getBottom(), 0xFF777777);
+        }
+
+        @Override
+        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput output) {
         }
     }
 
@@ -825,6 +882,7 @@ public final class ChatInputTranslationController {
         private final LanguageList list;
         private final List<Button> recentButtons = new ArrayList<>();
         private PopupTitleWidget title;
+        private PopupBackgroundWidget background;
 
         private LanguagePopup(int x, int top, int width, int bottom, LanguageList list) {
             this.x = x;

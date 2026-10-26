@@ -59,31 +59,22 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
             context.waitTicks(2);
             context.getInput().setCursorPos(0, 0);
             context.takeScreenshot("05-language-popup");
-        }
 
-        FakeProvider.resetResult();
-        try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-            prepareWorld(context, singleplayer);
-            ChatScreen chat = openChat(context);
+            // Reuse the same world: creating a second world was slow and left the next translation
+            // request unstarted in the earlier screenshot runs.
+            chat = reopenChat(context);
             type(context, FakeProvider.ERROR_INPUT);
             clickButton(context, chat, "chatglot.input.translate");
             waitForTranslation(context, FakeProvider.ERROR_INPUT);
             context.takeScreenshot("06-error");
-        }
 
-        FakeProvider.resetResult();
-        try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-            prepareWorld(context, singleplayer);
-            ChatScreen chat = openChat(context);
+            chat = reopenChat(context);
             type(context, FakeProvider.LONG_INPUT);
             clickButton(context, chat, "chatglot.input.translate");
             waitForTranslation(context, FakeProvider.LONG_INPUT);
             context.takeScreenshot("07-too-long");
-        }
 
-        try (TestSingleplayerContext singleplayer = context.worldBuilder().create()) {
-            prepareWorld(context, singleplayer);
-            ChatScreen chat = openChat(context);
+            chat = reopenChat(context);
             type(context, "/tp @s 0 64 0");
             context.waitTicks(2);
             Button translateButton = findButton(context, chat, "chatglot.input.translate");
@@ -133,6 +124,17 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
         runtime.configManager().save();
     }
 
+    static ChatScreen reopenChat(ClientGameTestContext context) {
+        FakeProvider.resetResult();
+        context.runOnClient(client -> client.gui.setScreen(null));
+        context.waitTicks(2);
+        ChatScreen chat = openChat(context);
+        // 26.3 keeps the unsent chat draft across reopening, so clear it before typing the next case.
+        context.runOnClient(client -> ((ChatScreenAccessor) chat).chatglot$getInput().setValue(""));
+        context.waitTicks(2);
+        return chat;
+    }
+
     static ChatScreen openChat(ClientGameTestContext context) {
         context.getInput().pressKey(options -> options.keyChat);
         context.waitForScreen(ChatScreen.class);
@@ -146,7 +148,15 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
     }
 
     static void waitForTranslation(ClientGameTestContext context, String input) {
-        context.waitFor(client -> FakeProvider.completedInput().equals(input));
+        try {
+            context.waitFor(client -> FakeProvider.completedInput().equals(input), 200);
+        } catch (AssertionError error) {
+            String detail = context.computeOnClient(client -> "screen=" + client.gui.screen()
+                + " input=" + (client.gui.screen() instanceof ChatScreen chat
+                    ? ((ChatScreenAccessor) chat).chatglot$getInput().getValue() : "-"));
+            throw new AssertionError("Translation for '" + input + "' did not finish. started='"
+                + FakeProvider.startedInput() + "' completed='" + FakeProvider.completedInput() + "' " + detail, error);
+        }
         context.waitTicks(3);
     }
 
@@ -203,7 +213,9 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
             MouseHandler.getScaledXPos(client.getWindow(), client.mouseHandler.xpos()),
             MouseHandler.getScaledYPos(client.getWindow(), client.mouseHandler.ypos())
         });
-        boolean overButton = context.computeOnClient(client -> button.isMouseOver(cursor[0], cursor[1]));
+        // isMouseOver is false for inactive widgets, but the disabled command case still needs a hover.
+        boolean overButton = context.computeOnClient(client -> cursor[0] >= button.getX()
+            && cursor[0] < button.getRight() && cursor[1] >= button.getY() && cursor[1] < button.getBottom());
         if (!overButton) {
             throw new IllegalStateException("Mouse missed chat control at " + cursor[0] + "," + cursor[1]
                 + " (button at " + button.getX() + "," + button.getY() + ").");
@@ -268,7 +280,8 @@ public final class ChatInputTranslationScreenshotTest implements FabricClientGam
                 }
                 if (ERROR_INPUT.equals(request.text())) {
                     throw TranslationException.classified(
-                        TranslationException.Kind.NETWORK, "Screenshot test network failure.", ID
+                        // NETWORK is retried by the service, which would capture the loading frame instead.
+                        TranslationException.Kind.AUTH, "Screenshot test authentication failure.", ID
                     );
                 }
                 if (LONG_INPUT.equals(request.text())) {

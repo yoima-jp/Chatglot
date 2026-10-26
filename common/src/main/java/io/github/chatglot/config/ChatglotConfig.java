@@ -273,8 +273,13 @@ public class ChatglotConfig {
         if ("openai_compatible".equals(provider)) {
             provider = "custom_llm";
         }
+        // google_web is only the internal implementation behind "default", not a user-selectable
+        // provider. Fold it back so the settings UI and saved config only ever show "default".
+        if ("google_web".equals(provider)) {
+            provider = DEFAULT_PROVIDER;
+        }
         switch (provider) {
-            case "default", "google_web", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini", "anthropic", "azure", "translategemma_local" -> {
+            case "default", "deepl", "google", "gas", "codex", "openai", "custom_llm", "gemini", "anthropic", "azure", "translategemma_local" -> {
             }
             default -> provider = DEFAULT_PROVIDER;
         }

@@ -1296,7 +1296,6 @@ function jsonResponse(data) {
 
     private enum ProviderOption {
         DEFAULT("default"),
-        GOOGLE_WEB("google_web"),
         GAS("gas"),
         DEEPL("deepl"),
         GOOGLE("google"),
@@ -1323,8 +1322,7 @@ function jsonResponse(data) {
                 return DEFAULT;
             }
             return switch (value.trim().toLowerCase(Locale.ROOT)) {
-                case "default" -> DEFAULT;
-                case "google_web" -> GOOGLE_WEB;
+                case "default", "google_web" -> DEFAULT;
                 case "gas" -> GAS;
                 case "deepl" -> DEEPL;
                 case "google" -> GOOGLE;

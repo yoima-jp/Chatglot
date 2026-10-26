@@ -32,7 +32,6 @@ Chatglot supports multiple translation backends. Switch between them in the sett
 | Provider | Requires |
 |---|---|
 | `default` | Nothing. Google's unofficial free web API, not paid Cloud Translation; no key or setup required, but it may be limited or changed without notice. |
-| `google_web` | Same unofficial Google Translate web API, selectable directly |
 | `gas` | Your own Google Apps Script web app URL |
 | `deepl` | DeepL API key |
 | `google` | Google Cloud Translation API key |
@@ -92,7 +91,7 @@ Running `/chatglot diagnose` sends the fixed test text `Hello` to the selected p
 
 Manually translating a sign sends its visible text to the selected provider. Manually translating a page in a written, lectern, or writable book sends only that page's text to the selected provider. Translating a writable book never changes its page contents. Looking at a sign or opening a book alone does not send a request. The local TranslateGemma option keeps sign and book text local.
 
-- **`default` / `google_web` providers**: Chat text is sent to Google's unofficial web translation API. It is free and needs no user setup, but access may be limited or changed without notice; switch providers if it becomes unavailable.
+- **`default` provider**: Chat text is sent to Google's unofficial web translation API. It is free and needs no user setup, but access may be limited or changed without notice; switch providers if it becomes unavailable.
 - **`gas` provider**: Chat text is sent to the Google Apps Script web app URL that you configure. Requests are processed through Google's infrastructure. See [Google Apps Script Additional Terms](https://developers.google.com/apps-script/terms) and [Google API Services User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
 - **`openai` provider**: Chat text is sent to the OpenAI API using your API key. See [OpenAI data controls](https://platform.openai.com/docs/guides/your-data/).
 - **`codex` provider**: Uses browser-based OAuth, stores the token locally, and then uses that token to send chat text to OpenAI services. The mod also fetches the available model list from [`https://modelapi.yoima.com/api/codex-models/list`](https://modelapi.yoima.com/api/codex-models/list). No chat content is sent to that model-list endpoint.

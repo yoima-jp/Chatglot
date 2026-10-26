@@ -133,17 +133,23 @@ public final class ChatTranslationService {
         }
 
         TranslationProvider provider = providerOptional.orElseThrow();
+        // The settings screen writes draft values into the live config object in place, so a request
+        // waiting in the executor could otherwise run with newer settings than its cache key describes
+        // and persist a new-model result under the old-model key. Freeze the settings at acceptance and
+        // use the snapshot for both the cache key and the provider call. The live object is still used
+        // where identity matters (in-flight dedup and settings-bound circuit breaker blocks).
+        ChatglotConfig settings = config.copy();
         String resolvedSourceHint = LanguageUtil.normalize(sourceLanguageHint);
         TranslationCache.Key cacheKey = new TranslationCache.Key(
             providerId,
             resolvedSourceHint,
             resolvedTargetLanguage,
             text,
-            outputSettingsFingerprint(providerId, config)
+            outputSettingsFingerprint(providerId, settings)
         );
         TranslationKey key = new TranslationKey(cacheKey, config);
-        if (useCache && config.translationCacheEnabled) {
-            Optional<TranslationCache.Entry> cached = translationCache.get(cacheKey, config.translationCacheMaxEntries);
+        if (useCache && settings.translationCacheEnabled) {
+            Optional<TranslationCache.Entry> cached = translationCache.get(cacheKey, settings.translationCacheMaxEntries);
             if (cached.isPresent()) {
                 return CompletableFuture.completedFuture(toResult(cacheKey, cached.orElseThrow()));
             }
@@ -160,8 +166,8 @@ public final class ChatTranslationService {
         }
 
         // A request may have filled the persistent cache between the first lookup and this map insertion.
-        if (useCache && config.translationCacheEnabled) {
-            Optional<TranslationCache.Entry> cached = translationCache.get(cacheKey, config.translationCacheMaxEntries);
+        if (useCache && settings.translationCacheEnabled) {
+            Optional<TranslationCache.Entry> cached = translationCache.get(cacheKey, settings.translationCacheMaxEntries);
             if (cached.isPresent()) {
                 inFlight.remove(key, created);
                 created.complete(toResult(cacheKey, cached.orElseThrow()));
@@ -178,10 +184,10 @@ public final class ChatTranslationService {
         }
 
         TranslationRequest request = new TranslationRequest(text, resolvedTargetLanguage, resolvedSourceHint, automatic);
-        ExecutorService currentExecutor = ensureExecutor(config.maxConcurrentTranslations);
+        ExecutorService currentExecutor = ensureExecutor(settings.maxConcurrentTranslations);
         try {
             currentExecutor.execute(() -> executeTranslation(
-                key, created, cacheKey, provider, request, config, providerId, useCache
+                key, created, cacheKey, provider, request, config, settings, providerId, useCache
             ));
         } catch (RuntimeException e) {
             completeFailure(key, created, TranslationException.caused(
@@ -197,6 +203,7 @@ public final class ChatTranslationService {
         TranslationCache.Key cacheKey,
         TranslationProvider provider,
         TranslationRequest request,
+        ChatglotConfig identityConfig,
         ChatglotConfig config,
         String providerId,
         boolean useCache
@@ -207,7 +214,7 @@ public final class ChatTranslationService {
         ChatglotConfig attemptConfig = config;
         while (true) {
             if (request.automatic()) {
-                Optional<TranslationException> breakerFailure = circuitBreaker.failureIfBlocked(providerId, config);
+                Optional<TranslationException> breakerFailure = circuitBreaker.failureIfBlocked(providerId, identityConfig);
                 if (breakerFailure.isPresent()) {
                     completeFailure(key, shared, breakerFailure.orElseThrow());
                     return;
@@ -237,7 +244,7 @@ public final class ChatTranslationService {
                     : exception;
                 long elapsedNanos = System.nanoTime() - startedAtNanos;
                 if (!TranslationRetryPolicy.shouldRetry(failure, retriesUsed)) {
-                    completeFailure(key, shared, recordFailure(providerId, config, failure));
+                    completeFailure(key, shared, recordFailure(providerId, identityConfig, failure));
                     return;
                 }
 
@@ -251,7 +258,7 @@ public final class ChatTranslationService {
                 );
                 // Codex keeps a five-second floor for each fallback request, so shorter remaining budgets cannot be honored.
                 if (remainingSeconds < ("codex".equals(providerId) ? 5 : 1)) {
-                    completeFailure(key, shared, recordFailure(providerId, config, failure));
+                    completeFailure(key, shared, recordFailure(providerId, identityConfig, failure));
                     return;
                 }
 
@@ -274,7 +281,7 @@ public final class ChatTranslationService {
                     System.nanoTime() - startedAtNanos, budgetNanos, 0
                 );
                 if (remainingSeconds < ("codex".equals(providerId) ? 5 : 1)) {
-                    completeFailure(key, shared, recordFailure(providerId, config, failure));
+                    completeFailure(key, shared, recordFailure(providerId, identityConfig, failure));
                     return;
                 }
 
